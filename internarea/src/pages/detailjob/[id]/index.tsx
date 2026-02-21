@@ -6,6 +6,7 @@ import {
   Book,
   Calendar,
   Cat,
+  CheckCircle2,
   Clock,
   DollarSign,
   ExternalLink,
@@ -16,6 +17,7 @@ import axios from "axios";
 import { toast } from "react-toastify";
 import { useSelector } from "react-redux";
 import { selectuser } from "@/Feature/Userslice";
+import { getApiEndpoint } from "@/utils/api";
 // const filteredJobs = [
 //     {
 //       _id: "101",
@@ -124,10 +126,11 @@ const index = () => {
   useEffect(() => {
     const fetchdata = async () => {
       try {
-        const res = await axios.get(`https://internshala-clone-y2p2.onrender.com/api/job/${id}`);
+        const res = await axios.get(getApiEndpoint(`/job/${id}`));
         setjob(res.data);
+        console.log("✅ Job detail fetched:", res.data);
       } catch (error) {
-        console.log(error);
+        console.error("❌ Error fetching job detail:", error);
       }
     };
     fetchdata();
@@ -162,14 +165,15 @@ const index = () => {
         availability,
       };
       await axios.post(
-        "https://internshala-clone-y2p2.onrender.com/api/application",
+        getApiEndpoint("/application"),
         applicationdata
       );
       toast.success("Application submit successfully");
       router.push("/job");
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
-      toast.error("Failed to submit application");
+      const errorMessage = error.response?.data?.error || error.response?.data?.message || "Failed to submit application";
+      toast.error(errorMessage);
     }
   };
   return (
@@ -244,12 +248,25 @@ const index = () => {
         </div>
         {/* Apply Button */}
         <div className="p-6 flex justify-center">
-          <button
-            onClick={() => setIsModalOpen(true)}
-            className="bg-blue-600 text-white px-8 py-3 rounded-lg hover:bg-blue-700 transition duration-150"
-          >
-            Apply Now
-          </button>
+          {jobdata.postedBy && user && jobdata.postedBy.uid === user.uid ? (
+            <div className="bg-gray-100 text-gray-600 px-8 py-3 rounded-lg flex items-center space-x-2">
+              <CheckCircle2 className="h-5 w-5" />
+              <span>You posted this job</span>
+            </div>
+          ) : (
+            <button
+              onClick={() => {
+                if (!user) {
+                  toast.error("Please login to apply");
+                  return;
+                }
+                setIsModalOpen(true);
+              }}
+              className="bg-blue-600 text-white px-8 py-3 rounded-lg hover:bg-blue-700 transition duration-150"
+            >
+              Apply Now
+            </button>
+          )}
         </div>
       </div>
       {/* Apply Modal */}

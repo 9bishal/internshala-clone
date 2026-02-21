@@ -5,10 +5,11 @@ const adminpass = "admin";
 
 router.post("/adminlogin", (req, res) => {
   const { username, password } = req.body;
-  if (username === adminuser && password === adminpass) {
-    res.send("admin is here");
+  // Simple auth - update with proper Firebase auth later
+  if (username === "admin" && password === "admin") {
+    res.json({ success: true, message: "Admin login successful", token: "admin-token-123" });
   } else {
-    res.send(401).send("unauthrized");
+    res.status(401).json({ success: false, message: "Invalid credentials" });
   }
 });
 module.exports = router;

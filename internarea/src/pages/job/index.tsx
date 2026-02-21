@@ -11,8 +11,12 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import React, { useEffect, useState } from "react";
+import { getApiEndpoint } from "@/utils/api";
+import { useSelector } from "react-redux";
+import { selectuser } from "@/Feature/Userslice";
 
 const index = () => {
+  const user = useSelector(selectuser);
   // const filteredJobs = [
   //   {
   //     _id: "101",
@@ -123,31 +127,91 @@ const index = () => {
     salary: 50,
     experience: "",
   });
-  const [filteredJobs,setjob]=useState<any>([])
-  useEffect(()=>{
-    const fetchdata=async()=>{
+  const [filteredJobs, setjob] = useState<any>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Fetch jobs with retry logic
+  const fetchJobsWithRetry = async (retries = 3) => {
+    let lastError: any = null;
+    
+    for (let attempt = 1; attempt <= retries; attempt++) {
       try {
-        const res=await axios.get( "https://internshala-clone-y2p2.onrender.com/api/job")     
-        setjob(res.data)
-        setfilteredjobs(res.data)
-      } catch (error) {
-        console.log(error)
+        console.log(`Fetching jobs (Attempt ${attempt}/${retries})`);
+        const endpoint = getApiEndpoint("/job");
+        console.log("Jobs endpoint:", endpoint);
+        
+        const res = await axios.get(endpoint, { timeout: 5000 });
+        
+        console.log("✅ Jobs fetched successfully:", res.data);
+        setjob(res.data || []);
+        setfilteredjobs(res.data || []);
+        setError(null);
+        return; // Success
+      } catch (error: any) {
+        lastError = error;
+        console.error(`❌ Error fetching jobs (Attempt ${attempt}/${retries}):`, error.message);
+        console.error("Error details:", {
+          code: error.code,
+          status: error.response?.status,
+          message: error.message,
+          url: error.config?.url,
+        });
+        
+        // Wait before retrying
+        if (attempt < retries) {
+          await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+        }
       }
     }
-    fetchdata()
-  },[])
+    
+    // All retries failed
+    console.error("Failed to fetch jobs after all retries:", lastError);
+    setjob([]);
+    setfilteredjobs([]);
+    
+    // Set user-friendly error message
+    if (lastError.code === 'ECONNABORTED' || lastError.message === 'Network Error') {
+      setError("Unable to connect to the server. Please check if the backend is running on http://localhost:5001");
+    } else if (lastError.response?.status === 404) {
+      setError("Jobs endpoint not found. Please check the backend API.");
+    } else {
+      setError(`Failed to load jobs: ${lastError.message || 'Unknown error'}`);
+    }
+  };
+
+  useEffect(() => {
+    const loadJobs = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        await fetchJobsWithRetry();
+      } catch (err) {
+        console.error("Error in useEffect:", err);
+        setError("An unexpected error occurred while loading jobs");
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    loadJobs();
+  }, []);
   useEffect(() => {
     const filtered = filteredJobs.filter((job:any) => {
-      const matchesCategory = job.category
+      // Don't show jobs posted by the current user
+      if (user && job.postedBy && job.postedBy.uid === user.uid) {
+        return false;
+      }
+      const matchesCategory = (job.category || "")
         .toLowerCase()
         .includes(filter.category.toLowerCase());
-      const matchesLocation = job.location
+      const matchesLocation = (job.location || "")
         .toLowerCase()
         .includes(filter.location.toLowerCase());
       return matchesCategory && matchesLocation;
     });
     setfilteredjobs(filtered);
-  }, [filter, filteredJobs]);
+  }, [filter, filteredJobs, user]);
   const handlefilterchange = (e: any) => {
     const { name, value, type, checked } = e.target;
     setfilters((prev) => ({
@@ -288,6 +352,37 @@ const index = () => {
                 {filteredjob.length} Jobs found
               </p>
             </div>
+            {loading ? (
+              <div className="bg-white p-8 rounded-lg shadow-sm text-center">
+                <div className="flex justify-center mb-4">
+                  <div className="animate-spin h-8 w-8 text-blue-600">
+                    <PlayCircle className="h-8 w-8" />
+                  </div>
+                </div>
+                <p className="text-gray-600">Loading jobs...</p>
+              </div>
+            ) : error ? (
+              <div className="bg-red-50 border border-red-200 rounded-lg p-8 text-center">
+                <div className="mb-4 text-4xl">⚠️</div>
+                <p className="text-red-800 font-semibold mb-2">Error Loading Jobs</p>
+                <p className="text-red-600 mb-4">{error}</p>
+                <button
+                  onClick={() => {
+                    setLoading(true);
+                    setError(null);
+                    fetchJobsWithRetry();
+                  }}
+                  className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+                >
+                  Try Again
+                </button>
+              </div>
+            ) : filteredjob.length === 0 ? (
+              <div className="bg-white p-8 rounded-lg shadow-sm text-center">
+                <p className="text-gray-600">No jobs found matching your filters</p>
+              </div>
+            ) : null}
+            {!loading && filteredjob.length > 0 && (
             <div className="space-y-4">
               {filteredjob.map((job: any) => (
                 <div
@@ -346,6 +441,7 @@ const index = () => {
                 </div>
               ))}
             </div>
+            )}
           </div>
         </div>
       </div>

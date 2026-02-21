@@ -13,7 +13,12 @@ import {
 import { toast } from "react-toastify";
 import axios from "axios";
 import { useRouter } from "next/navigation";
+import { getApiEndpoint } from "@/utils/api";
+import { useSelector } from "react-redux";
+import { selectuser } from "@/Feature/Userslice";
+
 const index = () => {
+  const user = useSelector(selectuser);
   const [formData, setFormData] = useState({
     title: "",
     company: "",
@@ -45,14 +50,25 @@ const index = () => {
       toast.error("Please fill in all detials");
       return;
     }
+    if (!user) {
+      toast.error("Please login to post a job");
+      return;
+    }
     try {
       setisloading(true);
-      const res = await axios.post("https://internshala-clone-y2p2.onrender.com/api/job", formData);
+      const jobData = {
+        ...formData,
+        postedBy: user,
+      };
+      console.log('📝 [PostJob] Posting job with data:', jobData);
+      const res = await axios.post(getApiEndpoint("/job"), jobData);
+      console.log('✅ [PostJob] Job posted successfully:', res.data);
       toast.success("job posted successfuly");
       router.push("/adminpanel");
-    } catch (error) {
-      console.log(error);
-      toast.error("error posting job");
+    } catch (error: any) {
+      console.error('❌ [PostJob] Error posting job:', error);
+      console.error('❌ [PostJob] Error response:', error.response?.data);
+      toast.error(error.response?.data?.message || "error posting job");
     } finally {
       setisloading(false);
     }

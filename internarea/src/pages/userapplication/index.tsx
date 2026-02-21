@@ -8,6 +8,7 @@ import {
   User,
   XCircle,
 } from "lucide-react";
+import { getApiEndpoint } from "@/utils/api";
 import Link from "next/link";
 import axios from "axios";
 import { selectuser } from "@/Feature/Userslice";
@@ -63,10 +64,11 @@ const index = () => {
   useEffect(() => {
     const fetchdata = async () => {
       try {
-        const res = await axios.get("https://internshala-clone-y2p2.onrender.com/api/application");
+        const res = await axios.get(getApiEndpoint("/application"));
         setdata(res.data);
+        console.log("✅ User applications fetched:", res.data);
       } catch (error) {
-        console.log(error);
+        console.error("❌ Error fetching user applications:", error);
       }
     };
     fetchdata();

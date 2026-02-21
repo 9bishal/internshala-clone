@@ -4,6 +4,7 @@ import { Navigation, Pagination, Autoplay } from "swiper/modules";
 import "swiper/css";
 import "swiper/css/navigation";
 import "swiper/css/pagination";
+import { getApiEndpoint } from "@/utils/api";
 import {
   ArrowUpRight,
   Banknote,
@@ -13,8 +14,11 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import axios from "axios";
+import { useSelector } from "react-redux";
+import { selectuser } from "@/Feature/Userslice";
 
 export default function SvgSlider() {
+  const user = useSelector(selectuser);
   const categories = [
     "Big Brands",
     "Work From Home",
@@ -119,24 +123,33 @@ export default function SvgSlider() {
     const fetchdata = async () => {
       try {
         const [internshipres, jobres] = await Promise.all([
-          axios.get("https://internshala-clone-y2p2.onrender.com/api/internship"),
-          axios.get("https://internshala-clone-y2p2.onrender.com/api/job"),
+          axios.get(getApiEndpoint("/internship")),
+          axios.get(getApiEndpoint("/job")),
         ]);
         setinternship(internshipres.data);
         setjob(jobres.data);
+        console.log("✅ Home page data fetched successfully");
       } catch (error) {
-        console.log(error);
+        console.error("❌ Error fetching home data:", error);
       }
     };
     fetchdata();
   }, []);
   const [selectedCategory, setSelectedCategory] = useState("");
-  const filteredInternships = internships.filter(
-    (item: any) => !selectedCategory || item.category === selectedCategory
-  );
-  const filteredJobs = jobs.filter(
-    (item: any) => !selectedCategory || item.category === selectedCategory
-  );
+  const filteredInternships = internships.filter((item: any) => {
+    // Filter out user's own internship postings
+    if (user && item.postedBy && item.postedBy.uid === user.uid) {
+      return false;
+    }
+    return !selectedCategory || item.category === selectedCategory;
+  });
+  const filteredJobs = jobs.filter((item: any) => {
+    // Filter out user's own job postings
+    if (user && item.postedBy && item.postedBy.uid === user.uid) {
+      return false;
+    }
+    return !selectedCategory || item.category === selectedCategory;
+  });
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       {/* hero section */}
@@ -343,7 +356,7 @@ export default function SvgSlider() {
                   Jobs
                 </span>
                 <Link
-                  href={`/detailInternship?q=${job._id}`}
+                  href={`/detailjob/${job._id}`}
                   className="text-blue-600 hover:text-blue-700 flex items-center gap-1"
                 >
                   View details

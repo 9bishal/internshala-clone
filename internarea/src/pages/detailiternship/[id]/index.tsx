@@ -3,6 +3,7 @@ import axios from "axios";
 import {
   ArrowUpRight,
   Calendar,
+  CheckCircle2,
   Clock,
   DollarSign,
   ExternalLink,
@@ -14,6 +15,7 @@ import { useRouter } from "next/router";
 import React, { useEffect, useState } from "react";
 import { useSelector } from "react-redux";
 import { toast } from "react-toastify";
+import { getApiEndpoint } from "@/utils/api";
 // export const internships = [
 //   {
 //     _id: "1",
@@ -78,13 +80,14 @@ const index = () => {
   useEffect(()=>{
     const fetchdata=async()=>{
       try {
-        const res=await axios.get( `https://internshala-clone-y2p2.onrender.com/api/internship/${id}`)     
+        const res=await axios.get(getApiEndpoint(`/internship/${id}`))     
         setinternship(res.data)
+        console.log("✅ Internship detail fetched:", res.data);
       } catch (error) {
-        console.log(error)
+        console.error("❌ Error fetching internship detail:", error)
       }
     }
-    fetchdata()
+    if(id) fetchdata()
   },[id])
   const [availability, setAvailability] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -115,12 +118,13 @@ const index = () => {
         Application:id,
         availability
       }
-      await axios.post("https://internshala-clone-y2p2.onrender.com/api/application",applicationdata)
+      await axios.post(getApiEndpoint("/application"),applicationdata)
       toast.success("Application submit successfully")
       router.push('/internship')
-    } catch (error) {
+    } catch (error: any) {
       console.error(error)
-      toast.error("Failed to submit application")
+      const errorMessage = error.response?.data?.error || error.response?.data?.message || "Failed to submit application";
+      toast.error(errorMessage)
     }
   }
   return (
@@ -200,12 +204,25 @@ const index = () => {
         </div>
         {/* Apply Button */}
         <div className="p-6 flex justify-center">
-          <button
-            onClick={() => setIsModalOpen(true)}
-            className="bg-blue-600 text-white px-8 py-3 rounded-lg hover:bg-blue-700 transition duration-150"
-          >
-            Apply Now
-          </button>
+          {internshipData.postedBy && user && internshipData.postedBy.uid === user.uid ? (
+            <div className="bg-gray-100 text-gray-600 px-8 py-3 rounded-lg flex items-center space-x-2">
+              <CheckCircle2 className="h-5 w-5" />
+              <span>You posted this internship</span>
+            </div>
+          ) : (
+            <button
+              onClick={() => {
+                if (!user) {
+                  toast.error("Please login to apply");
+                  return;
+                }
+                setIsModalOpen(true);
+              }}
+              className="bg-blue-600 text-white px-8 py-3 rounded-lg hover:bg-blue-700 transition duration-150"
+            >
+              Apply Now
+            </button>
+          )}
         </div>
       </div>
       {/* Apply Modal */}

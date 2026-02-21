@@ -12,6 +12,9 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import React, { useEffect, useState } from "react";
+import { getApiEndpoint } from "@/utils/api";
+import { useSelector } from "react-redux";
+import { selectuser } from "@/Feature/Userslice";
 // const internshipData = [
 //   {
 //     _id: "1",
@@ -44,7 +47,9 @@ import React, { useEffect, useState } from "react";
 //     location: "Los Angeles",
 //   },
 // ];
+
 const index = () => {
+  const user = useSelector(selectuser);
   const [filteredInternships, setfilteredInternships] = useState<any>([]);
   const [isFiltervisible, setisFiltervisible] = useState(false);
   const [filter, setfilters] = useState({
@@ -54,31 +59,91 @@ const index = () => {
     partTime: false,
     stipend: 50,
   });
-  const [internshipData,setinternship]=useState<any>([])
-  useEffect(()=>{
-    const fetchdata=async()=>{
+  const [internshipData, setinternship] = useState<any>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Fetch internships with retry logic
+  const fetchInternshipsWithRetry = async (retries = 3) => {
+    let lastError: any = null;
+    
+    for (let attempt = 1; attempt <= retries; attempt++) {
       try {
-        const res=await axios.get( "https://internshala-clone-y2p2.onrender.com/api/internship")     
-        setinternship(res.data)
-        setfilteredInternships(res.data)
-      } catch (error) {
-        console.log(error)
+        console.log(`Fetching internships (Attempt ${attempt}/${retries})`);
+        const endpoint = getApiEndpoint("/internship");
+        console.log("Internships endpoint:", endpoint);
+        
+        const res = await axios.get(endpoint, { timeout: 5000 });
+        
+        console.log("✅ Internships fetched successfully:", res.data);
+        setinternship(res.data || []);
+        setfilteredInternships(res.data || []);
+        setError(null);
+        return; // Success
+      } catch (error: any) {
+        lastError = error;
+        console.error(`❌ Error fetching internships (Attempt ${attempt}/${retries}):`, error.message);
+        console.error("Error details:", {
+          code: error.code,
+          status: error.response?.status,
+          message: error.message,
+          url: error.config?.url,
+        });
+        
+        // Wait before retrying
+        if (attempt < retries) {
+          await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+        }
       }
     }
-    fetchdata()
-  },[])
+    
+    // All retries failed
+    console.error("Failed to fetch internships after all retries:", lastError);
+    setinternship([]);
+    setfilteredInternships([]);
+    
+    // Set user-friendly error message
+    if (lastError.code === 'ECONNABORTED' || lastError.message === 'Network Error') {
+      setError("Unable to connect to the server. Please check if the backend is running on http://localhost:5001");
+    } else if (lastError.response?.status === 404) {
+      setError("Internships endpoint not found. Please check the backend API.");
+    } else {
+      setError(`Failed to load internships: ${lastError.message || 'Unknown error'}`);
+    }
+  };
+
+  useEffect(() => {
+    const loadInternships = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        await fetchInternshipsWithRetry();
+      } catch (err) {
+        console.error("Error in useEffect:", err);
+        setError("An unexpected error occurred while loading internships");
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    loadInternships();
+  }, []);
   useEffect(() => {
     const filtered = internshipData.filter((internship:any) => {
-      const matchesCategory = internship.category
+      // Don't show internships posted by the current user
+      if (user && internship.postedBy && internship.postedBy.uid === user.uid) {
+        return false;
+      }
+      const matchesCategory = (internship.category || "")
         .toLowerCase()
         .includes(filter.category.toLowerCase());
-      const matchesLocation = internship.location
+      const matchesLocation = (internship.location || "")
         .toLowerCase()
         .includes(filter.location.toLowerCase());
       return matchesCategory && matchesLocation;
     });
     setfilteredInternships(filtered);
-  }, [filter, internshipData]);
+  }, [filter, internshipData, user]);
   const handlefilterchange = (e: any) => {
     const { name, value, type, checked } = e.target;
     setfilters((prev) => ({
@@ -205,6 +270,37 @@ const index = () => {
                 {filteredInternships.length} Internships found
               </p>
             </div>
+            {loading ? (
+              <div className="bg-white p-8 rounded-lg shadow-sm text-center">
+                <div className="flex justify-center mb-4">
+                  <div className="animate-spin h-8 w-8 text-blue-600">
+                    <PlayCircle className="h-8 w-8" />
+                  </div>
+                </div>
+                <p className="text-gray-600">Loading internships...</p>
+              </div>
+            ) : error ? (
+              <div className="bg-red-50 border border-red-200 rounded-lg p-8 text-center">
+                <div className="mb-4 text-4xl">⚠️</div>
+                <p className="text-red-800 font-semibold mb-2">Error Loading Internships</p>
+                <p className="text-red-600 mb-4">{error}</p>
+                <button
+                  onClick={() => {
+                    setLoading(true);
+                    setError(null);
+                    fetchInternshipsWithRetry();
+                  }}
+                  className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+                >
+                  Try Again
+                </button>
+              </div>
+            ) : filteredInternships.length === 0 ? (
+              <div className="bg-white p-8 rounded-lg shadow-sm text-center">
+                <p className="text-gray-600">No internships found matching your filters</p>
+              </div>
+            ) : null}
+            {!loading && !error && filteredInternships.length > 0 && (
             <div className="space-y-4">
               {filteredInternships.map((internship: any) => (
                 <div
@@ -263,6 +359,7 @@ const index = () => {
                 </div>
               ))}
             </div>
+            )}
           </div>
         </div>
       </div>

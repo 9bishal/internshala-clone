@@ -8,9 +8,12 @@ import {
   User,
   XCircle,
 } from "lucide-react";
+import { getApiEndpoint } from "@/utils/api";
 import Link from "next/link";
 import React, { useEffect, useState } from "react";
 import { toast } from "react-toastify";
+import { useSelector } from "react-redux";
+import { selectuser } from "@/Feature/Userslice";
 // const Applications = [
 //   {
 //     _id: "1",
@@ -48,22 +51,46 @@ const getStatusColor = (status: any) => {
   }
 };
 const index = () => {
+  const currentUser = useSelector(selectuser);
   const [searchTerm, setsearchTerm] = useState("");
   const [filter, setFilter] = useState("all");
   const [data, setdata] = useState<any>([]);
+  const [jobsAndInternships, setJobsAndInternships] = useState<any>({});
   useEffect(() => {
     const fetchdata = async () => {
       try {
-        const res = await axios.get("https://internshala-clone-y2p2.onrender.com/api/application");
-        setdata(res.data);
+        const [appRes, jobRes, internRes] = await Promise.all([
+          axios.get(getApiEndpoint("/application")),
+          axios.get(getApiEndpoint("/job")),
+          axios.get(getApiEndpoint("/internship")),
+        ]);
+        
+        // Build a map of job/internship IDs to their details
+        const jAndI: any = {};
+        jobRes.data.forEach((job: any) => {
+          jAndI[job._id] = job;
+        });
+        internRes.data.forEach((intern: any) => {
+          jAndI[intern._id] = intern;
+        });
+        
+        setJobsAndInternships(jAndI);
+        setdata(appRes.data);
+        console.log("✅ Applications fetched:", appRes.data);
       } catch (error) {
-        console.log(error);
+        console.error("❌ Error fetching applications:", error);
       }
     };
     fetchdata();
   }, []);
   // console.log(data);
   const filteredapplications = data.filter((application: any) => {
+    // Only show applications for jobs/internships posted by the current user
+    const posting = jobsAndInternships[application.Application];
+    if (!posting || !currentUser || !posting.postedBy || posting.postedBy.uid !== currentUser.uid) {
+      return false;
+    }
+    
     const searchmatch =
       application.company.toLowerCase().includes(searchTerm.toLowerCase()) ||
       application.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -74,7 +101,7 @@ const index = () => {
   const handleacceptandreject = async (id: any, action: any) => {
     try {
       const res = await axios.put(
-        `https://internshala-clone-y2p2.onrender.com/api/application/${id}`,
+        getApiEndpoint(`/application/${id}`),
         { action }
       );
       const updateappliacrtion = data.map((app: any) =>

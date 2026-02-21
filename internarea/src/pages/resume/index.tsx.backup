@@ -1,0 +1,441 @@
+import { useState, useEffect } from "react";
+import { useSelector } from "react-redux";
+import { selectuser } from "@/Feature/Userslice";
+import axios from "axios";
+import { getApiEndpoint } from "@/utils/api";
+import { useRouter } from "next/router";
+import {
+  Plus,
+  Download,
+  Trash2,
+  ArrowLeft,
+  Loader,
+  Lock,
+  FileText,
+  CheckCircle,
+} from "lucide-react";
+import { toast } from "react-toastify";
+
+interface Resume {
+  id: string;
+  fullName: string;
+  email: string;
+  phone: string;
+  summary: string;
+  experience: any[];
+  education: any[];
+  skills: string[];
+  createdAt: any;
+  updatedAt: any;
+}
+
+interface Access {
+  planId: string;
+  accessLevel: number;
+  maxResumes: number;
+  resumesCreated: number;
+  canCreateResume: boolean;
+  planDetails?: any;
+}
+
+export default function ResumeBuilder() {
+  const router = useRouter();
+  const user = useSelector(selectuser);
+  const [resumes, setResumes] = useState<Resume[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [userSubscription, setUserSubscription] = useState<any>(null);
+
+  useEffect(() => {
+    if (!user) {
+      router.push("/");
+      return;
+    }
+
+    fetchData();
+  }, [user]);
+
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+
+      // Fetch user's subscription
+      const subResponse = await axios.get(
+        getApiEndpoint(`/subscription/user/${user.uid}`)
+      );
+      setUserSubscription(subResponse.data.subscription);
+
+      // Fetch resumes - this will be implemented when we add resume storage
+      // For now, just check subscription
+    } catch (error: any) {
+      console.error("Error fetching data:", error);
+      toast.error("Failed to load data");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCreateResume = () => {
+    // Check if user has premium subscription
+    const premiumPlans = ["bronze", "silver", "gold"];
+    if (!userSubscription || !premiumPlans.includes(userSubscription.planId?.toLowerCase())) {
+      toast.error("Resume creation requires a premium subscription");
+      router.push("/subscription");
+      return;
+    }
+
+    // Redirect to create resume flow (OTP + Payment)
+    router.push("/resume/create");
+  };
+
+  const handleRequestOTP_OLD = async () => {
+    try {
+      const response = await axios.post(
+        getApiEndpoint("/resume-razorpay/request-otp"),
+        {
+          uid: user.uid,
+          email: user.email,
+          planId: selectedPlan,
+        }
+      );
+
+      toast.success(response.data.message);
+      setStep("purchase");
+    } catch (error: any) {
+      toast.error(
+        error.response?.data?.message || "Failed to request OTP"
+      );
+    }
+  };
+
+  const handlePurchase = async () => {
+    if (!otp || !selectedPlan) {
+      toast.error("Enter OTP and select a plan");
+      return;
+    }
+
+    setPurchasing(true);
+
+    try {
+      const response = await axios.post(getApiEndpoint("/resume/purchase"), {
+        uid: user.uid,
+        otp,
+        planId: selectedPlan,
+        paymentToken: "demo_token_" + Date.now(),
+      });
+
+      toast.success(response.data.message);
+      setAccess(response.data.access);
+      setShowPurchaseModal(false);
+      setSelectedPlan(null);
+      setOtp("");
+      setStep("otp");
+    } catch (error: any) {
+      toast.error(
+        error.response?.data?.message || "Failed to purchase"
+      );
+    } finally {
+      setPurchasing(false);
+    }
+  };
+
+  const handleCreateResume = () => {
+    if (!access?.canCreateResume) {
+      toast.info("Resume creation requires a premium plan (Bronze, Silver, or Gold)");
+      setTimeout(() => {
+        router.push("/subscription");
+      }, 1500);
+      return;
+    }
+
+    // Navigate to resume editor
+    router.push("/resume-editor");
+  };
+
+  const handleDeleteResume = async (resumeId: string) => {
+    if (!window.confirm("Are you sure you want to delete this resume?")) {
+      return;
+    }
+
+    try {
+      await axios.delete(getApiEndpoint(`/resume/delete/${resumeId}`));
+      toast.success("Resume deleted successfully");
+      setResumes(resumes.filter((r) => r.id !== resumeId));
+    } catch (error: any) {
+      toast.error("Failed to delete resume");
+    }
+  };
+
+  const formatDate = (date: any) => {
+    if (!date) return "N/A";
+    const dateObj = date.toDate ? date.toDate() : new Date(date);
+    return new Intl.DateTimeFormat("en-US", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    }).format(dateObj);
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50 py-12 px-4">
+      <div className="max-w-6xl mx-auto">
+        {/* Header */}
+        <div className="mb-12">
+          <button
+            onClick={() => router.back()}
+            className="flex items-center text-gray-600 hover:text-gray-900 mb-6 transition-colors"
+          >
+            <ArrowLeft className="w-5 h-5 mr-2" />
+            Back
+          </button>
+
+          <div className="flex items-start justify-between">
+            <div>
+              <h1 className="text-4xl font-bold text-gray-900">
+                Resume Builder
+              </h1>
+              <p className="text-gray-600 mt-2">
+                Create professional resumes with our AI-powered builder
+              </p>
+            </div>
+            <button
+              onClick={handleCreateResume}
+              className={`flex items-center gap-2 px-6 py-3 rounded-lg font-semibold transition-all ${
+                access?.canCreateResume
+                  ? "bg-gradient-to-r from-indigo-600 to-blue-600 text-white hover:shadow-lg"
+                  : "bg-gradient-to-r from-amber-500 to-orange-500 text-white hover:shadow-lg"
+              }`}
+            >
+              <Plus className="w-5 h-5" />
+              {access?.canCreateResume ? "Create New Resume (₹50)" : "Get Premium to Create"}
+            </button>
+          </div>
+        </div>
+
+        {/* Plan Info */}
+        {loading ? (
+          <div className="text-center py-12">
+            <Loader className="w-8 h-8 text-gray-400 animate-spin mx-auto mb-4" />
+            <p className="text-gray-600">Loading...</p>
+          </div>
+        ) : (
+          <>
+            {/* Pricing Info Banner */}
+            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-6 mb-8 border border-blue-200">
+              <div className="flex items-start justify-between">
+                <div className="flex-1">
+                  <h3 className="text-lg font-bold text-gray-900 mb-2">
+                    💼 Resume Creation Pricing
+                  </h3>
+                  <div className="space-y-2">
+                    <p className="text-sm text-gray-700">
+                      <span className="font-semibold">Subscription Required:</span> Bronze (₹100), Silver (₹300), or Gold (₹1000)
+                    </p>
+                    <p className="text-sm text-gray-700">
+                      <span className="font-semibold">Per Resume Fee:</span> ₹50 (OTP verification + Razorpay payment)
+                    </p>
+                    <p className="text-xs text-gray-600 mt-3">
+                      Note: Subscription plans allow you to apply for internships. Resume creation is an additional premium feature.
+                    </p>
+                  </div>
+                </div>
+                {!access?.canCreateResume && (
+                  <button
+                    onClick={() => router.push("/subscription")}
+                    className="ml-4 px-6 py-3 bg-gradient-to-r from-indigo-600 to-blue-600 text-white rounded-lg font-semibold hover:shadow-lg transition-all whitespace-nowrap"
+                  >
+                    View Subscription Plans
+                  </button>
+                )}
+              </div>
+            </div>
+
+            <div className="bg-white rounded-lg shadow-md p-6 mb-8">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-semibold text-gray-900">
+                    Current Plan: {access?.planDetails?.name || "Free"}
+                  </h3>
+                  <p className="text-sm text-gray-600 mt-1">
+                    Resumes created: {access?.resumesCreated || 0}
+                  </p>
+                  {!access?.canCreateResume && (
+                    <p className="text-sm text-red-600 mt-2 font-medium">
+                      ⚠️ Premium subscription required (Bronze/Silver/Gold)
+                    </p>
+                  )}
+                  {access?.canCreateResume && (
+                    <p className="text-sm text-green-600 mt-2 font-medium">
+                      ✓ Premium subscription active - Pay ₹50 per resume
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Resumes List */}
+            <div className="space-y-4">
+              <h2 className="text-2xl font-bold text-gray-900">
+                Your Resumes
+              </h2>
+
+              {resumes.length === 0 ? (
+                <div className="bg-white rounded-lg shadow-md p-12 text-center">
+                  <FileText className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                  <p className="text-gray-600 text-lg">
+                    No resumes created yet
+                  </p>
+                  <p className="text-gray-500 text-sm mt-2">
+                    {access?.canCreateResume
+                      ? "Click 'Create New Resume' to get started"
+                      : "Upgrade your plan to create resumes"}
+                  </p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {resumes.map((resume) => (
+                    <div
+                      key={resume.id}
+                      className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-all group"
+                    >
+                      <div className="p-6 border-b border-gray-200">
+                        <h3 className="font-semibold text-gray-900 truncate">
+                          {resume.fullName}
+                        </h3>
+                        <p className="text-sm text-gray-600 mt-1">
+                          {resume.email}
+                        </p>
+                      </div>
+
+                      <div className="p-4 space-y-2 text-sm text-gray-600">
+                        <div className="flex items-center gap-2">
+                          <span className="text-gray-500">Created:</span>
+                          <span>{formatDate(resume.createdAt)}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-gray-500">Skills:</span>
+                          <span>{resume.skills?.length || 0}</span>
+                        </div>
+                      </div>
+
+                      <div className="px-6 py-4 bg-gray-50 flex gap-2 border-t border-gray-200">
+                        <button className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-indigo-600 text-white rounded text-sm font-semibold hover:bg-indigo-700 transition-colors">
+                          <Download className="w-4 h-4" />
+                          Download
+                        </button>
+                        <button
+                          onClick={() => handleDeleteResume(resume.id)}
+                          className="px-3 py-2 bg-red-100 text-red-600 rounded text-sm font-semibold hover:bg-red-200 transition-colors"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Purchase Modal */}
+            {showPurchaseModal && (
+              <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-8">
+                  {step === "otp" ? (
+                    <>
+                      <h2 className="text-2xl font-bold text-gray-900 mb-6">
+                        Select Plan
+                      </h2>
+
+                      <div className="space-y-3 mb-6">
+                        {plans.map((plan) => (
+                          <button
+                            key={plan.id}
+                            onClick={() => setSelectedPlan(plan.id)}
+                            className={`w-full p-4 rounded-lg border-2 transition-all text-left ${
+                              selectedPlan === plan.id
+                                ? "border-indigo-600 bg-indigo-50"
+                                : "border-gray-200 hover:border-gray-300"
+                            }`}
+                          >
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <h4 className="font-semibold text-gray-900">
+                                  {plan.name}
+                                </h4>
+                                <p className="text-sm text-gray-600 mt-1">
+                                  {plan.templates} templates • ${plan.price}
+                                </p>
+                              </div>
+                              {selectedPlan === plan.id && (
+                                <CheckCircle className="w-5 h-5 text-indigo-600" />
+                              )}
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+
+                      <button
+                        onClick={handleRequestOTP}
+                        disabled={!selectedPlan}
+                        className="w-full bg-indigo-600 text-white py-3 rounded-lg font-semibold hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        Continue
+                      </button>
+
+                      <button
+                        onClick={() => setShowPurchaseModal(false)}
+                        className="w-full mt-2 text-gray-600 hover:text-gray-900 py-2"
+                      >
+                        Cancel
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <h2 className="text-2xl font-bold text-gray-900 mb-6">
+                        Enter OTP
+                      </h2>
+
+                      <p className="text-gray-600 text-sm mb-4">
+                        Enter the OTP sent to your email to confirm your
+                        purchase
+                      </p>
+
+                      <input
+                        type="text"
+                        value={otp}
+                        onChange={(e) =>
+                          setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))
+                        }
+                        placeholder="000000"
+                        maxLength={6}
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-center text-2xl tracking-widest font-mono mb-6"
+                      />
+
+                      <button
+                        onClick={handlePurchase}
+                        disabled={!otp || purchasing}
+                        className="w-full bg-indigo-600 text-white py-3 rounded-lg font-semibold hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {purchasing ? "Processing..." : "Verify & Purchase"}
+                      </button>
+
+                      <button
+                        onClick={() => {
+                          setStep("otp");
+                          setOtp("");
+                          setSelectedPlan(null);
+                        }}
+                        className="w-full mt-2 text-gray-600 hover:text-gray-900 py-2"
+                      >
+                        Back
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  );
+}

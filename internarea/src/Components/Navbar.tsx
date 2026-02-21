@@ -14,24 +14,51 @@ interface User {
 }
 const Navbar = () => {
   const user = useSelector(selectuser);
+  const [showUserMenu, setShowUserMenu] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
   const handlelogin = async () => {
     try {
-      await signInWithPopup(auth, provider);
-      toast.success("logged in successfully");
-    } catch (error) {
-      console.error(error);
-      toast.error("login failed");
+      console.log('🔐 Starting Google login...');
+      const result = await signInWithPopup(auth, provider);
+      console.log('✅ Login successful:', result.user.email);
+      toast.success("Logged in successfully");
+    } catch (error: any) {
+      console.error('❌ Login error:', error);
+      console.error('Error code:', error.code);
+      console.error('Error message:', error.message);
+      
+      // Handle specific Firebase auth errors
+      if (error.code === 'auth/popup-closed-by-user') {
+        console.log('ℹ️ User closed the popup without completing login');
+        // Don't show error toast for user-initiated cancellation
+      } else if (error.code === 'auth/cancelled-popup-request') {
+        console.log('ℹ️ Popup request was cancelled');
+        // Don't show error toast for cancelled request
+      } else if (error.code === 'auth/popup-blocked') {
+        toast.error("Popup was blocked. Please allow popups for this site.");
+      } else if (error.code === 'auth/operation-not-supported-in-this-environment') {
+        toast.error("Authentication is not supported in this browser environment.");
+      } else {
+        toast.error(`Login failed: ${error.message || 'Unknown error'}`);
+      }
     }
-    // setuser({
-    //   name: "Rahul",
-    //   email: "xyz@gmail.com",
-    //   photo:
-    //     "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=64&h=64&fit=crop&crop=faces",
-    // });
   };
   const handlelogout = () => {
     signOut(auth);
+    setShowUserMenu(false);
   };
+
+  // Close menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setShowUserMenu(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
   return (
     <div className="relative">
       <nav className="bg-white shadow-md">
@@ -55,6 +82,23 @@ const Navbar = () => {
                   <span>Jobs</span>
                 </Link>
               </button>
+              <button className="flex items-center space-x-1 text-gray-700 hover:text-blue-600">
+                <Link href={"/publicspace"}>
+                  <span>Public Space</span>
+                </Link>
+              </button>
+              {user && (
+                <button className="flex items-center space-x-1 text-gray-700 hover:text-blue-600">
+                  <Link href={"/messages"}>
+                    <span>Messages</span>
+                  </Link>
+                </button>
+              )}
+              <button className="flex items-center space-x-1 text-gray-700 hover:text-blue-600">
+                <Link href={"/subscription"}>
+                  <span>Premium</span>
+                </Link>
+              </button>
               <div className="flex items-center bg-gray-100 rounded-full px-4 py-2">
                 <Search size={16} className="text-gray-400" />
                 <input
@@ -68,23 +112,72 @@ const Navbar = () => {
             {/* Auth Buttons */}
             <div className="flex items-center space-x-4">
               {user ? (
-                <div className="relative flex">
-                  <button className="flex items-center space-x-2">
-                    {" "}
-                    <Link href={"/profile"}>
-                      <img
-                        src={user.photo}
-                        alt=""
-                        className="w-8 h-8 rounded-full"
-                      />
-                    </Link>
-                  </button>
+                <div className="relative" ref={menuRef}>
                   <button
-                    className="flex items-center w-full px-4 py-2  text-gray-700  hover:bg-gray-200 rounded-lg"
-                    onClick={handlelogout}
+                    onClick={() => setShowUserMenu(!showUserMenu)}
+                    className="flex items-center space-x-2 hover:bg-gray-100 rounded-lg px-3 py-2 transition-colors"
                   >
-                    Logout
+                    <img
+                      src={user.photo || "/default-avatar.png"}
+                      alt="user"
+                      className="w-8 h-8 rounded-full"
+                    />
+                    <span className="text-gray-700 hidden sm:inline max-w-[100px] truncate">
+                      {user.name}
+                    </span>
+                    {showUserMenu ? (
+                      <ChevronUp size={16} />
+                    ) : (
+                      <ChevronDown size={16} />
+                    )}
                   </button>
+
+                  {/* Dropdown Menu */}
+                  {showUserMenu && (
+                    <div className="absolute right-0 mt-2 w-64 bg-white rounded-lg shadow-xl z-50 border border-gray-200">
+                      {/* User Info */}
+                      <div className="px-4 py-3 border-b border-gray-200">
+                        <p className="text-sm font-semibold text-gray-900">
+                          {user.name}
+                        </p>
+                        <p className="text-xs text-gray-600 truncate">
+                          {user.email}
+                        </p>
+                      </div>
+
+                      {/* Menu Items */}
+                      <div className="py-2">
+                        <Link href="/profile" className="px-4 py-2 text-gray-700 hover:bg-gray-100 block text-sm">
+                          👤 My Profile
+                        </Link>
+                        <Link href="/messages" className="px-4 py-2 text-gray-700 hover:bg-gray-100 block text-sm">
+                          💬 My Messages
+                        </Link>
+                        <Link href="/friends" className="px-4 py-2 text-gray-700 hover:bg-gray-100 block text-sm">
+                          👥 Friends & Connections
+                        </Link>
+                        <Link href="/resume" className="px-4 py-2 text-gray-700 hover:bg-gray-100 block text-sm">
+                          📄 Resume Builder
+                        </Link>
+                        <Link href="/loginhistory" className="px-4 py-2 text-gray-700 hover:bg-gray-100 block text-sm">
+                          🔐 Login History
+                        </Link>
+                        <Link href="/language" className="px-4 py-2 text-gray-700 hover:bg-gray-100 block text-sm">
+                          🌐 Language
+                        </Link>
+                        <Link href="/forgotpassword" className="px-4 py-2 text-gray-700 hover:bg-gray-100 block text-sm">
+                          🔑 Change Password
+                        </Link>
+                        <div className="border-t border-gray-200 my-2"></div>
+                        <button
+                          onClick={handlelogout}
+                          className="w-full px-4 py-2 text-left text-red-600 hover:bg-red-50 text-sm font-medium"
+                        >
+                          🚪 Logout
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <>
@@ -112,10 +205,6 @@ const Navbar = () => {
                     </svg>
                     <span className="text-gray-700">Continue with google</span>
                   </button>
-                  {/* <button className="bg-blue-600 text-white px-4 py-2 rounded-full hover:bg-blue-700">
-                    {" "}
-                    <Link href={"/"}>Register</Link>
-                  </button> */}
                   <a
                     href="/adminlogin"
                     className="text-gray-600 hover:text-gray-800"

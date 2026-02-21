@@ -2,6 +2,7 @@ import axios from "axios";
 import { Building2, Calendar, FileText, Loader2, User } from "lucide-react";
 import { useRouter } from "next/router";
 import React, { useEffect, useState } from "react";
+import { getApiEndpoint } from "@/utils/api";
 
 const index = () => {
   const router = useRouter();
@@ -13,12 +14,12 @@ const index = () => {
       try {
         setloading(true);
         const res = await axios.get(
-          `https://internshala-clone-y2p2.onrender.com/api/application/${id}`
+          getApiEndpoint(`/application/${id}`)
         );
-        console.log(res.data);
+        console.log("✅ Application detail fetched:", res.data);
         setdata(res.data);
       } catch (error) {
-        console.log(error);
+        console.error("❌ Error fetching application detail:", error);
       } finally {
         setloading(false);
       }

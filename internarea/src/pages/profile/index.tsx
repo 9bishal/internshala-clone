@@ -1,21 +1,37 @@
 import { selectuser } from "@/Feature/Userslice";
 import { ExternalLink, Mail, User } from "lucide-react";
 import Link from "next/link";
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useSelector } from "react-redux";
+import axios from "axios";
+import { getApiEndpoint } from "@/utils/api";
 interface User {
   name: string;
   email: string;
   photo: string;
 }
 const index = () => {
-  // const [user, setuser] = useState<User | null>({
-  //   name: "Rahul",
-  //   email: "xyz@gmail.com",
-  //   photo:
-  //     "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=64&h=64&fit=crop&crop=faces",
-  // });
   const user=useSelector(selectuser)
+  const [applications, setApplications] = useState<any>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchApplications = async () => {
+      try {
+        if (!user) return;
+        const res = await axios.get(getApiEndpoint("/application"));
+        // Filter applications where the user ID matches
+        const userApps = res.data.filter((app: any) => app.user?.uid === user.uid);
+        setApplications(userApps);
+        console.log("✅ User applications fetched:", userApps);
+      } catch (error) {
+        console.error("❌ Error fetching applications:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchApplications();
+  }, [user]);
   return (
     <div className="min-h-screen bg-gray-50 py-12">
       <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -50,10 +66,10 @@ const index = () => {
             {/* Profile Details */}
             <div className="space-y-6">
               {/* Quick Stats */}
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-3 gap-4">
                 <div className="bg-blue-50 rounded-lg p-4 text-center">
                   <span className="text-blue-600 font-semibold text-2xl">
-                    0
+                    {applications.filter((app: any) => app.status === "pending").length}
                   </span>
                   <p className="text-blue-600 text-sm mt-1">
                     Active Applications
@@ -61,10 +77,18 @@ const index = () => {
                 </div>
                 <div className="bg-green-50 rounded-lg p-4 text-center">
                   <span className="text-green-600 font-semibold text-2xl">
-                    0
+                    {applications.filter((app: any) => app.status === "accepted").length}
                   </span>
                   <p className="text-green-600 text-sm mt-1">
                     Accepted Applications
+                  </p>
+                </div>
+                <div className="bg-purple-50 rounded-lg p-4 text-center">
+                  <span className="text-purple-600 font-semibold text-2xl">
+                    {applications.length}
+                  </span>
+                  <p className="text-purple-600 text-sm mt-1">
+                    Total Applied
                   </p>
                 </div>
               </div>
