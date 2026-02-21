@@ -1,0 +1,16 @@
+{
+  "name": "internshala-clone-tests",
+  "version": "1.0.0",
+  "description": "Automated tests for Public Space and Login History features",
+  "main": "run-all-tests.js",
+  "scripts": {
+    "test": "node run-all-tests.js",
+    "test:publicspace": "node publicspace.test.js",
+    "test:loginhistory": "node loginhistory.test.js"
+  },
+  "dependencies": {
+    "axios": "^1.6.0"
+  },
+  "author": "",
+  "license": "ISC"
+}
