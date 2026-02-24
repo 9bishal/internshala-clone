@@ -1,12 +1,15 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/router";
+import { useSelector } from "react-redux";
+import { selectuser } from "@/Feature/Userslice";
 import axios from "axios";
 import { getApiEndpoint } from "@/utils/api";
-import { Mail, Lock, Eye, EyeOff, ArrowLeft, CheckCircle } from "lucide-react";
+import { Mail, Lock, Eye, EyeOff, ArrowLeft, Loader } from "lucide-react";
 import { toast } from "react-toastify";
 
 export default function ForgotPassword() {
   const router = useRouter();
+  const user = useSelector(selectuser);
   const [step, setStep] = useState("email"); // email, otp, password
   const [email, setEmail] = useState("");
   const [otp, setOtp] = useState("");
@@ -15,9 +18,21 @@ export default function ForgotPassword() {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [timer, setTimer] = useState(0);
+  const [otpSent, setOtpSent] = useState(false);
+
+  // Auto-fill email if user is logged in
+  useEffect(() => {
+    if (user?.email) {
+      setEmail(user.email);
+    }
+  }, [user?.email]);
 
   const handleRequestOTP = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Prevent sending if already sent (double-click protection)
+    if (loading || otpSent) return;
+
     setLoading(true);
 
     try {
@@ -29,6 +44,7 @@ export default function ForgotPassword() {
       toast.success(response.data.message);
       setStep("otp");
       setTimer(600); // 10 minutes
+      setOtpSent(true);
     } catch (error: any) {
       toast.error(
         error.response?.data?.message || "Failed to send OTP"
@@ -79,12 +95,9 @@ export default function ForgotPassword() {
       interval = setInterval(() => {
         setTimer((prev) => prev - 1);
       }, 1000);
-    } else if (timer === 0 && step === "otp" && timer !== 0) {
-      setStep("email");
-      toast.info("OTP expired. Please request a new one.");
     }
     return () => clearInterval(interval);
-  }, [timer, step]);
+  }, [timer]);
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -106,12 +119,42 @@ export default function ForgotPassword() {
 
         {/* Card */}
         <div className="bg-white rounded-2xl shadow-xl overflow-hidden">
-          <div className="bg-gradient-to-r from-indigo-600 to-blue-600 px-8 py-12">
-            <h1 className="text-3xl font-bold text-white">Reset Password</h1>
-            <p className="text-indigo-100 mt-2">Secure password recovery</p>
+          <div className="bg-gradient-to-r from-indigo-600 to-blue-600 px-8 py-10">
+            <h1 className="text-2xl sm:text-3xl font-bold text-white">
+              {user ? "Change Password" : "Reset Password"}
+            </h1>
+            <p className="text-indigo-100 mt-2 text-sm">
+              {user 
+                ? `Logged in as ${user.email}` 
+                : "Secure password recovery"
+              }
+            </p>
           </div>
 
-          <form onSubmit={step === "email" ? handleRequestOTP : handleVerifyOTP} className="p-8">
+          {/* Progress Steps */}
+          <div className="px-8 pt-6">
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center">
+                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
+                  step === "email" ? "bg-indigo-600 text-white" : "bg-green-500 text-white"
+                }`}>
+                  {step !== "email" ? "✓" : "1"}
+                </div>
+                <span className="ml-2 text-xs text-gray-600 hidden sm:inline">Email</span>
+              </div>
+              <div className={`flex-1 h-0.5 mx-2 ${step !== "email" ? "bg-green-500" : "bg-gray-200"}`} />
+              <div className="flex items-center">
+                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
+                  step === "otp" ? "bg-indigo-600 text-white" : step === "email" ? "bg-gray-200 text-gray-500" : "bg-green-500 text-white"
+                }`}>
+                  2
+                </div>
+                <span className="ml-2 text-xs text-gray-600 hidden sm:inline">Verify & Reset</span>
+              </div>
+            </div>
+          </div>
+
+          <form onSubmit={step === "email" ? handleRequestOTP : handleVerifyOTP} className="px-8 pb-8">
             {/* Step 1: Email */}
             {step === "email" && (
               <div className="space-y-4">
@@ -125,28 +168,50 @@ export default function ForgotPassword() {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="Enter your registered email"
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+                    className={`w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all text-gray-900 ${
+                      user?.email ? "bg-gray-50" : ""
+                    }`}
                     required
+                    readOnly={!!user?.email}
                   />
+                  {user?.email && (
+                    <p className="text-xs text-green-600 mt-1">
+                      ✓ Auto-filled from your logged-in account
+                    </p>
+                  )}
                 </div>
 
                 <button
                   type="submit"
-                  disabled={loading || !email}
-                  className="w-full bg-gradient-to-r from-indigo-600 to-blue-600 text-white py-3 rounded-lg font-semibold hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled={loading || !email || otpSent}
+                  className="w-full bg-gradient-to-r from-indigo-600 to-blue-600 text-white py-3 rounded-lg font-semibold hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
-                  {loading ? "Sending..." : "Send OTP"}
+                  {loading ? (
+                    <>
+                      <Loader className="w-4 h-4 animate-spin" />
+                      Sending OTP...
+                    </>
+                  ) : otpSent ? (
+                    "OTP Already Sent"
+                  ) : (
+                    "Send OTP"
+                  )}
                 </button>
               </div>
             )}
 
-            {/* Step 2: OTP */}
+            {/* Step 2: OTP & New Password */}
             {step === "otp" && (
               <div className="space-y-4">
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-2">
                   <p className="text-sm text-gray-700">
                     OTP sent to <span className="font-semibold">{email}</span>
                   </p>
+                  {timer > 0 && (
+                    <p className="text-xs text-gray-500 mt-1">
+                      Expires in: <span className="font-semibold text-red-600">{formatTime(timer)}</span>
+                    </p>
+                  )}
                 </div>
 
                 <div>
@@ -159,12 +224,10 @@ export default function ForgotPassword() {
                     onChange={(e) => setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
                     placeholder="000000"
                     maxLength={6}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-center text-2xl tracking-widest font-mono transition-all"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-center text-2xl tracking-widest font-mono transition-all text-gray-900"
                     required
+                    autoFocus
                   />
-                  <p className="text-xs text-gray-500 mt-2">
-                    Expires in: <span className="font-semibold text-red-600">{formatTime(timer)}</span>
-                  </p>
                 </div>
 
                 <div>
@@ -177,8 +240,8 @@ export default function ForgotPassword() {
                       type={showPassword ? "text" : "password"}
                       value={newPassword}
                       onChange={(e) => setNewPassword(e.target.value)}
-                      placeholder="Enter new password"
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+                      placeholder="Enter new password (min 6 chars)"
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all pr-10 text-gray-900"
                       required
                     />
                     <button
@@ -193,6 +256,14 @@ export default function ForgotPassword() {
                       )}
                     </button>
                   </div>
+                  {/* Password strength indicator */}
+                  {newPassword && (
+                    <div className="mt-2 space-y-1">
+                      <div className={`text-xs flex items-center gap-1 ${newPassword.length >= 6 ? "text-green-600" : "text-gray-400"}`}>
+                        {newPassword.length >= 6 ? "✓" : "○"} At least 6 characters
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <div>
@@ -204,25 +275,44 @@ export default function ForgotPassword() {
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
                     placeholder="Confirm password"
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all text-gray-900"
                     required
                   />
+                  {confirmPassword && newPassword !== confirmPassword && (
+                    <p className="text-xs text-red-500 mt-1">Passwords do not match</p>
+                  )}
+                  {confirmPassword && newPassword === confirmPassword && confirmPassword.length >= 6 && (
+                    <p className="text-xs text-green-600 mt-1">✓ Passwords match</p>
+                  )}
                 </div>
 
                 <button
                   type="submit"
-                  disabled={loading || !otp || !newPassword || !confirmPassword}
-                  className="w-full bg-gradient-to-r from-indigo-600 to-blue-600 text-white py-3 rounded-lg font-semibold hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled={loading || !otp || !newPassword || !confirmPassword || newPassword !== confirmPassword}
+                  className="w-full bg-gradient-to-r from-indigo-600 to-blue-600 text-white py-3 rounded-lg font-semibold hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
-                  {loading ? "Resetting..." : "Reset Password"}
+                  {loading ? (
+                    <>
+                      <Loader className="w-4 h-4 animate-spin" />
+                      Resetting...
+                    </>
+                  ) : (
+                    "Reset Password"
+                  )}
                 </button>
 
                 <button
                   type="button"
-                  onClick={() => setStep("email")}
-                  className="w-full text-indigo-600 hover:text-indigo-700 font-medium py-2"
+                  onClick={() => {
+                    setStep("email");
+                    setOtpSent(false);
+                    setOtp("");
+                    setNewPassword("");
+                    setConfirmPassword("");
+                  }}
+                  className="w-full text-indigo-600 hover:text-indigo-700 font-medium py-2 text-sm"
                 >
-                  Try different email
+                  ← Try different email
                 </button>
               </div>
             )}
@@ -231,7 +321,15 @@ export default function ForgotPassword() {
 
         {/* Help Text */}
         <div className="text-center mt-6 text-sm text-gray-600">
-          <p>Having trouble? <a href="#" className="text-indigo-600 hover:text-indigo-700 font-medium">Contact Support</a></p>
+          <p>
+            Remember your password?{" "}
+            <button
+              onClick={() => router.push("/")}
+              className="text-indigo-600 hover:text-indigo-700 font-medium"
+            >
+              Go to Login
+            </button>
+          </p>
         </div>
       </div>
     </div>

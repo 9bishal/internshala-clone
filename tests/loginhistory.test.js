@@ -60,10 +60,13 @@ async function runLoginHistoryTests() {
   // Test 2: Record Login History (Desktop Chrome)
   await testRecordLoginDesktopChrome();
 
-  // Test 3: Record Login History (Mobile Safari)
+  // Test 3: Chrome Browser Requires OTP
+  await testChromeRequiresOTP();
+
+  // Test 4: Record Login History (Mobile Safari / Mobile Time Restriction)
   await testRecordLoginMobileSafari();
 
-  // Test 4: Record Login History (Different IP - Suspicious)
+  // Test 5: Record Login History (Different IP - Suspicious)
   await testRecordLoginDifferentIP();
 
   // Test 5: Get Login History
@@ -122,6 +125,11 @@ async function testRecordLoginDesktopChrome() {
 
     if (response.status === 200 && response.data.message === 'Login recorded') {
       log(`  Suspicious: ${response.data.isSuspicious}`, colors.yellow);
+      // Verify Chrome OTP requirement is flagged
+      if (response.data.requiresChromeOTP) {
+        log(`  Chrome OTP Required: ${response.data.requiresChromeOTP} ✓`, colors.yellow);
+        log(`  Chrome OTP Message: ${response.data.chromeOTPMessage}`, colors.yellow);
+      }
       pass('Record Login History - Desktop Chrome');
       testResults.passed++;
     } else {
@@ -130,6 +138,34 @@ async function testRecordLoginDesktopChrome() {
     }
   } catch (error) {
     fail('Record Login History - Desktop Chrome', error.message);
+    testResults.failed++;
+  }
+}
+
+// NEW TEST: Verify Chrome browser requires OTP
+async function testChromeRequiresOTP() {
+  try {
+    const response = await axios.post(`${API_BASE_URL}/auth/login-history`, {
+      uid: 'chrome-otp-test-user',
+      email: 'chrometest@example.com',
+      ipAddress: '192.168.1.200',
+      deviceInfo: {
+        browser: 'Chrome',
+        os: 'Windows',
+        device: 'Desktop',
+      },
+    });
+
+    if (response.status === 200 && response.data.requiresChromeOTP === true) {
+      log(`  Chrome OTP Required: true ✓`, colors.yellow);
+      pass('Chrome Browser Requires OTP Verification');
+      testResults.passed++;
+    } else {
+      fail('Chrome Browser Requires OTP', `requiresChromeOTP was ${response.data.requiresChromeOTP}`);
+      testResults.failed++;
+    }
+  } catch (error) {
+    fail('Chrome Browser Requires OTP', error.message);
     testResults.failed++;
   }
 }
@@ -149,6 +185,7 @@ async function testRecordLoginMobileSafari() {
     });
 
     if (response.status === 200) {
+      log(`  Mobile login allowed (within 10 AM - 1 PM IST window)`, colors.yellow);
       log(`  Suspicious: ${response.data.isSuspicious}`, colors.yellow);
       if (response.data.isSuspicious) {
         log(`  Reason: ${response.data.suspiciousReason}`, colors.yellow);
@@ -160,8 +197,19 @@ async function testRecordLoginMobileSafari() {
       testResults.failed++;
     }
   } catch (error) {
-    fail('Record Login History - Mobile Safari', error.message);
-    testResults.failed++;
+    const status = error.response?.status;
+    const message = error.response?.data?.message;
+    
+    // 403 with mobile_time_restriction is CORRECT behavior
+    if (status === 403 && error.response?.data?.reason === 'mobile_time_restriction') {
+      log(`  Mobile login correctly blocked: ${message}`, colors.yellow);
+      log(`  Allowed window: ${JSON.stringify(error.response?.data?.allowedWindow)}`, colors.yellow);
+      pass('Record Login History - Mobile Time Restriction Enforced');
+      testResults.passed++;
+    } else {
+      fail('Record Login History - Mobile Safari', message || error.message);
+      testResults.failed++;
+    }
   }
 }
 
@@ -325,7 +373,7 @@ async function testDeviceDetection() {
     },
     {
       name: 'Mobile iPhone Safari',
-      userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15',
+      userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1',
       expected: { device: 'Mobile', browser: 'Safari', os: 'iOS' }
     },
     {
@@ -368,18 +416,19 @@ async function testDeviceDetection() {
 // ============================================
 
 function detectDevice(userAgent) {
-  const browser = userAgent.includes('Chrome') ? 'Chrome' :
+  const browser = userAgent.includes('Chrome') && !userAgent.includes('Edg') ? 'Chrome' :
                  userAgent.includes('Firefox') ? 'Firefox' :
-                 userAgent.includes('Safari') ? 'Safari' :
-                 userAgent.includes('Edge') ? 'Edge' : 'Unknown';
+                 userAgent.includes('Edg') ? 'Edge' :
+                 userAgent.includes('Safari') ? 'Safari' : 'Unknown';
   
-  const os = userAgent.includes('Win') ? 'Windows' :
+  // Check mobile OS first (iPhone UA contains "Mac OS X")
+  const os = userAgent.includes('iPhone') || userAgent.includes('iPad') ? 'iOS' :
+            userAgent.includes('Android') ? 'Android' :
+            userAgent.includes('Win') ? 'Windows' :
             userAgent.includes('Mac') ? 'macOS' :
-            userAgent.includes('Linux') ? 'Linux' :
-            userAgent.includes('iPhone') || userAgent.includes('iOS') ? 'iOS' :
-            userAgent.includes('Android') ? 'Android' : 'Unknown';
+            userAgent.includes('Linux') ? 'Linux' : 'Unknown';
   
-  const device = /mobile|android|iphone|ipad|phone/i.test(userAgent) ? 'Mobile' :
+  const device = /mobile|android|iphone|phone/i.test(userAgent) ? 'Mobile' :
                 /tablet|ipad/i.test(userAgent) ? 'Tablet' : 'Desktop';
   
   return { browser, os, device };

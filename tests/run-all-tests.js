@@ -1,11 +1,14 @@
 /**
- * Combined Test Runner
+ * Master Test Runner - Internshala Clone
  * 
- * Runs all test suites and provides a comprehensive report
+ * Runs ALL test suites for the 6 project tasks:
+ * 1. Public Space (posts, likes, comments, shares, friend-based limits)
+ * 2. Forgot Password (once-per-day, password generator, OTP)
+ * 3. Subscription Plans (plans, pricing, Razorpay, time window)
+ * 4. Resume Creation (premium check, OTP, Razorpay, save)
+ * 5. Multi-Language (6 languages, French OTP, translations)
+ * 6. Login History (device tracking, Chrome OTP, mobile time restriction)
  */
-
-const { runPublicSpaceTests } = require('./publicspace.test');
-const { runLoginHistoryTests } = require('./loginhistory.test');
 
 const colors = {
   reset: '\x1b[0m',
@@ -21,64 +24,72 @@ function log(message, color = colors.reset) {
   console.log(`${color}${message}${colors.reset}`);
 }
 
-function banner(title) {
-  const line = '═'.repeat(60);
-  log(`\n${line}`, colors.cyan);
-  log(`  ${title}`, colors.cyan);
-  log(`${line}\n`, colors.cyan);
+function banner() {
+  log('\n' + '█'.repeat(60), colors.cyan);
+  log('█                                                          █', colors.cyan);
+  log('█      INTERNSHALA CLONE — COMPLETE TEST SUITE             █', colors.cyan);
+  log('█      Testing All 6 Project Tasks                         █', colors.cyan);
+  log('█                                                          █', colors.cyan);
+  log('█'.repeat(60), colors.cyan);
 }
 
 async function runAllTests() {
-  banner('🧪 INTERNSHALA CLONE - COMPLETE TEST SUITE');
-  
-  log('Testing Environment:', colors.yellow);
-  log('  Backend API: http://localhost:4000/api');
-  log('  Frontend App: http://localhost:3000');
-  log('  Date: ' + new Date().toLocaleString());
-  log('');
+  banner();
 
-  const startTime = Date.now();
-  let exitCode = 0;
+  const testModules = [
+    { name: '1. Public Space', file: './publicspace.test.js', fn: 'runPublicSpaceTests' },
+    { name: '2. Forgot Password', file: './forgotpassword.test.js', fn: 'runForgotPasswordTests' },
+    { name: '3. Subscription Plans', file: './subscription.test.js', fn: 'runSubscriptionTests' },
+    { name: '4. Resume Creation', file: './resume.test.js', fn: 'runResumeTests' },
+    { name: '5. Multi-Language', file: './language.test.js', fn: 'runLanguageTests' },
+    { name: '6. Login History', file: './loginhistory.test.js', fn: 'runLoginHistoryTests' },
+  ];
 
-  try {
-    // Run Public Space Tests
-    banner('📱 PUBLIC SPACE FEATURE TESTS');
-    await runPublicSpaceTests();
+  const results = [];
 
-    // Wait a bit between test suites
-    await new Promise(resolve => setTimeout(resolve, 2000));
+  for (const module of testModules) {
+    log(`\n${'─'.repeat(60)}`, colors.magenta);
+    log(`TASK ${module.name}`, colors.magenta);
+    log('─'.repeat(60), colors.magenta);
 
-    // Run Login History Tests
-    banner('🔐 LOGIN HISTORY FEATURE TESTS');
-    await runLoginHistoryTests();
+    try {
+      const testModule = require(module.file);
+      if (testModule[module.fn]) {
+        await testModule[module.fn]();
+        results.push({ name: module.name, status: 'completed' });
+      } else {
+        log(`  ⚠️  Test function ${module.fn} not found in ${module.file}`, colors.yellow);
+        results.push({ name: module.name, status: 'skipped' });
+      }
+    } catch (error) {
+      log(`  ✗ Error running ${module.name}: ${error.message}`, colors.red);
+      results.push({ name: module.name, status: 'error', error: error.message });
+    }
+  }
 
-  } catch (error) {
-    log('\n❌ Test suite encountered an error:', colors.red);
+  // Final Summary
+  log('\n' + '█'.repeat(60), colors.cyan);
+  log('█  OVERALL RESULTS                                         █', colors.cyan);
+  log('█'.repeat(60), colors.cyan);
+
+  for (const result of results) {
+    const icon = result.status === 'completed' ? '✅' : result.status === 'skipped' ? '⊘' : '❌';
+    const color = result.status === 'completed' ? colors.green : result.status === 'skipped' ? colors.yellow : colors.red;
+    log(`  ${icon} ${result.name}: ${result.status}`, color);
+  }
+
+  const completed = results.filter(r => r.status === 'completed').length;
+  log(`\n  Completed: ${completed}/${results.length} test suites`, completed === results.length ? colors.green : colors.yellow);
+  log('█'.repeat(60) + '\n', colors.cyan);
+}
+
+runAllTests()
+  .then(() => {
+    log('All test suites executed.', colors.green);
+    process.exit(0);
+  })
+  .catch((error) => {
+    log('Master test runner failed:', colors.red);
     console.error(error);
-    exitCode = 1;
-  }
-
-  const endTime = Date.now();
-  const duration = ((endTime - startTime) / 1000).toFixed(2);
-
-  banner('📊 FINAL REPORT');
-  log(`Total Execution Time: ${duration}s`, colors.yellow);
-  log('');
-
-  if (exitCode === 0) {
-    log('✅ All test suites completed successfully!', colors.green);
-  } else {
-    log('⚠️  Some tests failed. Please review the output above.', colors.red);
-  }
-
-  log('\n' + '═'.repeat(60) + '\n', colors.cyan);
-
-  process.exit(exitCode);
-}
-
-// Run if executed directly
-if (require.main === module) {
-  runAllTests();
-}
-
-module.exports = { runAllTests };
+    process.exit(1);
+  });

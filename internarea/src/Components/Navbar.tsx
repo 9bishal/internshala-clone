@@ -1,64 +1,86 @@
-import React, { use, useEffect, useRef, useState } from "react";
-import logo from "../Assets/logo.png";
+import React, { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { auth, provider } from "../firebase/firebase";
-import { ChevronDown, ChevronUp, Search } from "lucide-react";
-import { signInWithPopup, signOut } from "firebase/auth";
+import {
+  auth,
+  signInWithEmailAndPassword,
+} from "../firebase/firebase";
+import { signOut } from "firebase/auth";
+import { ChevronDown, ChevronUp, Search, Mail, Lock, Eye, EyeOff, LogIn } from "lucide-react";
 import { toast } from "react-toastify";
 import { useSelector } from "react-redux";
 import { selectuser } from "@/Feature/Userslice";
+
 interface User {
   name: string;
   email: string;
   photo: string;
 }
+
 const Navbar = () => {
   const user = useSelector(selectuser);
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const [showLoginForm, setShowLoginForm] = useState(false);
+  const [loginEmail, setLoginEmail] = useState("");
+  const [loginPassword, setLoginPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [loginLoading, setLoginLoading] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
-  const handlelogin = async () => {
+  const loginFormRef = useRef<HTMLDivElement>(null);
+
+  const handleEmailLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoginLoading(true);
+
     try {
-      console.log('🔐 Starting Google login...');
-      const result = await signInWithPopup(auth, provider);
-      console.log('✅ Login successful:', result.user.email);
-      toast.success("Logged in successfully");
+      const result = await signInWithEmailAndPassword(auth, loginEmail, loginPassword);
+      console.log("✅ Login successful:", result.user.email);
+      toast.success("Logged in successfully!");
+      setShowLoginForm(false);
+      setLoginEmail("");
+      setLoginPassword("");
     } catch (error: any) {
-      console.error('❌ Login error:', error);
-      console.error('Error code:', error.code);
-      console.error('Error message:', error.message);
-      
+      console.error("❌ Login error:", error);
+
       // Handle specific Firebase auth errors
-      if (error.code === 'auth/popup-closed-by-user') {
-        console.log('ℹ️ User closed the popup without completing login');
-        // Don't show error toast for user-initiated cancellation
-      } else if (error.code === 'auth/cancelled-popup-request') {
-        console.log('ℹ️ Popup request was cancelled');
-        // Don't show error toast for cancelled request
-      } else if (error.code === 'auth/popup-blocked') {
-        toast.error("Popup was blocked. Please allow popups for this site.");
-      } else if (error.code === 'auth/operation-not-supported-in-this-environment') {
-        toast.error("Authentication is not supported in this browser environment.");
+      if (error.code === "auth/user-not-found") {
+        toast.error("No account found with this email. Please register first.");
+      } else if (error.code === "auth/wrong-password" || error.code === "auth/invalid-credential") {
+        toast.error("Incorrect password. Please try again.");
+      } else if (error.code === "auth/invalid-email") {
+        toast.error("Invalid email address.");
+      } else if (error.code === "auth/too-many-requests") {
+        toast.error("Too many failed attempts. Please try again later.");
       } else {
-        toast.error(`Login failed: ${error.message || 'Unknown error'}`);
+        toast.error(`Login failed: ${error.message || "Unknown error"}`);
       }
+    } finally {
+      setLoginLoading(false);
     }
   };
+
   const handlelogout = () => {
     signOut(auth);
     setShowUserMenu(false);
   };
 
-  // Close menu when clicking outside
+  // Close menus when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
         setShowUserMenu(false);
+      }
+      if (
+        loginFormRef.current &&
+        !loginFormRef.current.contains(event.target as Node)
+      ) {
+        setShowLoginForm(false);
       }
     };
 
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
   return (
     <div className="relative">
       <nav className="bg-white shadow-md">
@@ -72,33 +94,23 @@ const Navbar = () => {
             </div>
             {/* Navigation Links */}
             <div className="hidden md:flex items-center space-x-8">
-              <button className="flex items-center space-x-1 text-gray-700 hover:text-blue-600">
-                <Link href={"/internship"}>
-                  <span>Internships</span>
-                </Link>
-              </button>
-              <button className="flex items-center space-x-1 text-gray-700 hover:text-blue-600">
-                <Link href={"/job"}>
-                  <span>Jobs</span>
-                </Link>
-              </button>
-              <button className="flex items-center space-x-1 text-gray-700 hover:text-blue-600">
-                <Link href={"/publicspace"}>
-                  <span>Public Space</span>
-                </Link>
-              </button>
+              <Link href="/internship" className="flex items-center space-x-1 text-gray-700 hover:text-blue-600 transition-colors">
+                <span>Internships</span>
+              </Link>
+              <Link href="/job" className="flex items-center space-x-1 text-gray-700 hover:text-blue-600 transition-colors">
+                <span>Jobs</span>
+              </Link>
+              <Link href="/publicspace" className="flex items-center space-x-1 text-gray-700 hover:text-blue-600 transition-colors">
+                <span>Public Space</span>
+              </Link>
               {user && (
-                <button className="flex items-center space-x-1 text-gray-700 hover:text-blue-600">
-                  <Link href={"/messages"}>
-                    <span>Messages</span>
-                  </Link>
-                </button>
-              )}
-              <button className="flex items-center space-x-1 text-gray-700 hover:text-blue-600">
-                <Link href={"/subscription"}>
-                  <span>Premium</span>
+                <Link href="/messages" className="flex items-center space-x-1 text-gray-700 hover:text-blue-600 transition-colors">
+                  <span>Messages</span>
                 </Link>
-              </button>
+              )}
+              <Link href="/subscription" className="flex items-center space-x-1 text-gray-700 hover:text-blue-600 transition-colors">
+                <span>Premium</span>
+              </Link>
               <div className="flex items-center bg-gray-100 rounded-full px-4 py-2">
                 <Search size={16} className="text-gray-400" />
                 <input
@@ -180,38 +192,114 @@ const Navbar = () => {
                   )}
                 </div>
               ) : (
-                <>
-                  <button
-                    onClick={handlelogin}
-                    className="w-full bg-white border border-gray-300 rounded-lg px-4 py-2 flex items-center justify-center space-x-2 hover:bg-gray-50 "
+                <div className="flex items-center space-x-3">
+                  {/* Login Button */}
+                  <div className="relative" ref={loginFormRef}>
+                    <button
+                      onClick={() => setShowLoginForm(!showLoginForm)}
+                      className="bg-gradient-to-r from-indigo-600 to-blue-600 text-white rounded-lg px-5 py-2 flex items-center space-x-2 hover:shadow-lg transition-all font-medium text-sm"
+                    >
+                      <LogIn size={16} />
+                      <span>Login</span>
+                    </button>
+
+                    {/* Login Dropdown Form */}
+                    {showLoginForm && (
+                      <div className="absolute right-0 mt-3 w-80 bg-white rounded-xl shadow-2xl z-50 border border-gray-200 overflow-hidden">
+                        <div className="bg-gradient-to-r from-indigo-600 to-blue-600 px-6 py-4">
+                          <h3 className="text-white text-lg font-bold">Welcome Back</h3>
+                          <p className="text-indigo-100 text-xs">Sign in with your email and password</p>
+                        </div>
+                        <form onSubmit={handleEmailLogin} className="p-5 space-y-4">
+                          {/* Email Input */}
+                          <div>
+                            <label className="block text-xs font-medium text-gray-600 mb-1">
+                              Email Address
+                            </label>
+                            <div className="relative">
+                              <Mail size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                              <input
+                                type="email"
+                                value={loginEmail}
+                                onChange={(e) => setLoginEmail(e.target.value)}
+                                placeholder="you@example.com"
+                                className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-sm transition-all"
+                                required
+                              />
+                            </div>
+                          </div>
+
+                          {/* Password Input */}
+                          <div>
+                            <label className="block text-xs font-medium text-gray-600 mb-1">
+                              Password
+                            </label>
+                            <div className="relative">
+                              <Lock size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                              <input
+                                type={showPassword ? "text" : "password"}
+                                value={loginPassword}
+                                onChange={(e) => setLoginPassword(e.target.value)}
+                                placeholder="Enter your password"
+                                className="w-full pl-10 pr-10 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-sm transition-all"
+                                required
+                              />
+                              <button
+                                type="button"
+                                onClick={() => setShowPassword(!showPassword)}
+                                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                              >
+                                {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Login Button */}
+                          <button
+                            type="submit"
+                            disabled={loginLoading || !loginEmail || !loginPassword}
+                            className="w-full bg-gradient-to-r from-indigo-600 to-blue-600 text-white py-2.5 rounded-lg font-semibold text-sm hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            {loginLoading ? "Signing in..." : "Sign In"}
+                          </button>
+
+                          {/* Links */}
+                          <div className="flex justify-between items-center text-xs">
+                            <Link
+                              href="/forgotpassword"
+                              className="text-indigo-600 hover:text-indigo-700 font-medium"
+                              onClick={() => setShowLoginForm(false)}
+                            >
+                              Forgot Password?
+                            </Link>
+                            <Link
+                              href="/register"
+                              className="text-indigo-600 hover:text-indigo-700 font-medium"
+                              onClick={() => setShowLoginForm(false)}
+                            >
+                              Create Account
+                            </Link>
+                          </div>
+                        </form>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Register Button */}
+                  <Link
+                    href="/register"
+                    className="border border-indigo-600 text-indigo-600 rounded-lg px-5 py-2 hover:bg-indigo-50 transition-all font-medium text-sm"
                   >
-                    <svg className="w-5 h-5" viewBox="0 0 24 24">
-                      <path
-                        fill="#4285F4"
-                        d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-                      />
-                      <path
-                        fill="#34A853"
-                        d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-                      />
-                      <path
-                        fill="#FBBC05"
-                        d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
-                      />
-                      <path
-                        fill="#EA4335"
-                        d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
-                      />
-                    </svg>
-                    <span className="text-gray-700">Continue with google</span>
-                  </button>
+                    Register
+                  </Link>
+
                   <a
                     href="/adminlogin"
-                    className="text-gray-600 hover:text-gray-800"
+                    className="text-gray-600 hover:text-gray-800 text-sm"
                   >
                     Admin
                   </a>
-                </>
+                </div>
               )}
             </div>
           </div>{" "}

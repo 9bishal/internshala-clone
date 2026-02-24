@@ -40,15 +40,25 @@ export default function SubscriptionPlans() {
   );
   const [loading, setLoading] = useState(true);
   const [subscribing, setSubscribing] = useState<string | null>(null);
+  const [authChecked, setAuthChecked] = useState(false);
+
+  // Wait for auth to resolve before deciding to redirect
+  useEffect(() => {
+    // Give Firebase auth a moment to resolve the user state
+    const timer = setTimeout(() => {
+      setAuthChecked(true);
+    }, 1500);
+    return () => clearTimeout(timer);
+  }, []);
 
   useEffect(() => {
-    if (!user) {
-      router.push("/");
-      return;
+    if (user) {
+      fetchPlansAndSubscription();
+    } else if (authChecked && !user) {
+      // Only redirect after auth has had time to resolve
+      setLoading(false);
     }
-
-    fetchPlansAndSubscription();
-  }, [user]);
+  }, [user, authChecked]);
 
   const fetchPlansAndSubscription = async () => {
     try {
@@ -244,7 +254,24 @@ export default function SubscriptionPlans() {
         )}
 
         {/* Loading State */}
-        {loading ? (
+        {loading && !authChecked ? (
+          <div className="text-center py-16">
+            <Loader className="w-8 h-8 text-gray-400 animate-spin mx-auto mb-4" />
+            <p className="text-gray-600">Loading plans...</p>
+          </div>
+        ) : !user ? (
+          <div className="text-center py-16">
+            <Shield className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">Sign in to view plans</h2>
+            <p className="text-gray-600 mb-6">Please log in to view and subscribe to our premium plans.</p>
+            <button
+              onClick={() => router.push("/")}
+              className="bg-gradient-to-r from-indigo-600 to-blue-600 text-white px-8 py-3 rounded-lg font-semibold hover:shadow-lg transition-all"
+            >
+              Go to Login
+            </button>
+          </div>
+        ) : loading ? (
           <div className="text-center py-16">
             <Loader className="w-8 h-8 text-gray-400 animate-spin mx-auto mb-4" />
             <p className="text-gray-600">Loading plans...</p>

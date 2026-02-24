@@ -1,26 +1,21 @@
 const express = require("express");
 const router = express.Router();
 const admin = require("firebase-admin");
-const nodemailer = require("nodemailer");
+const sgMail = require("@sendgrid/mail");
 
 let db;
 
-// Configure email service
-const transporter = nodemailer.createTransport({
-  service: "gmail",
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASSWORD,
-  },
-});
+// Configure SendGrid email service
+sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 
-// Supported languages
+// Supported languages (6 as per task: English, Spanish, Hindi, Portuguese, Chinese, French)
 const SUPPORTED_LANGUAGES = {
   en: { name: "English", nativeName: "English", requiresOTP: false },
-  fr: { name: "French", nativeName: "Français", requiresOTP: true },
   es: { name: "Spanish", nativeName: "Español", requiresOTP: false },
-  de: { name: "German", nativeName: "Deutsch", requiresOTP: false },
   hi: { name: "Hindi", nativeName: "हिंदी", requiresOTP: false },
+  pt: { name: "Portuguese", nativeName: "Português", requiresOTP: false },
+  zh: { name: "Chinese", nativeName: "中文", requiresOTP: false },
+  fr: { name: "French", nativeName: "Français", requiresOTP: true },
 };
 
 // Translations
@@ -28,22 +23,74 @@ const TRANSLATIONS = {
   en: {
     welcome: "Welcome to Internshala",
     hello: "Hello",
-  },
-  fr: {
-    welcome: "Bienvenue sur Internshala",
-    hello: "Bonjour",
+    internships: "Internships",
+    jobs: "Jobs",
+    profile: "Profile",
+    settings: "Settings",
+    logout: "Logout",
+    search: "Search",
+    apply: "Apply",
+    home: "Home",
   },
   es: {
     welcome: "Bienvenido a Internshala",
     hello: "Hola",
-  },
-  de: {
-    welcome: "Willkommen bei Internshala",
-    hello: "Hallo",
+    internships: "Pasantías",
+    jobs: "Empleos",
+    profile: "Perfil",
+    settings: "Configuración",
+    logout: "Cerrar sesión",
+    search: "Buscar",
+    apply: "Aplicar",
+    home: "Inicio",
   },
   hi: {
     welcome: "इंटर्नशाला में स्वागत है",
     hello: "नमस्ते",
+    internships: "इंटर्नशिप",
+    jobs: "नौकरियां",
+    profile: "प्रोफाइल",
+    settings: "सेटिंग्स",
+    logout: "लॉग आउट",
+    search: "खोजें",
+    apply: "आवेदन करें",
+    home: "होम",
+  },
+  pt: {
+    welcome: "Bem-vindo ao Internshala",
+    hello: "Olá",
+    internships: "Estágios",
+    jobs: "Empregos",
+    profile: "Perfil",
+    settings: "Configurações",
+    logout: "Sair",
+    search: "Pesquisar",
+    apply: "Aplicar",
+    home: "Início",
+  },
+  zh: {
+    welcome: "欢迎来到Internshala",
+    hello: "你好",
+    internships: "实习",
+    jobs: "工作",
+    profile: "个人资料",
+    settings: "设置",
+    logout: "退出",
+    search: "搜索",
+    apply: "申请",
+    home: "首页",
+  },
+  fr: {
+    welcome: "Bienvenue sur Internshala",
+    hello: "Bonjour",
+    internships: "Stages",
+    jobs: "Emplois",
+    profile: "Profil",
+    settings: "Paramètres",
+    logout: "Déconnexion",
+    search: "Rechercher",
+    apply: "Postuler",
+    home: "Accueil",
   },
 };
 
@@ -97,15 +144,19 @@ async function sendOTPEmail(email, otp, language = "en") {
           </div>
         `;
 
-    await transporter.sendMail({
-      from: process.env.EMAIL_USER,
+    const msg = {
       to: email,
+      from: process.env.DEFAULT_FROM_EMAIL,
       subject,
       html: htmlContent,
-    });
+    };
+    await sgMail.send(msg);
     return true;
   } catch (error) {
     console.error("Error sending OTP email:", error);
+    if (error.response) {
+      console.error(error.response.body);
+    }
     return false;
   }
 }
@@ -173,10 +224,12 @@ router.post("/request-change", async (req, res) => {
     // Check if OTP is required for this language
     if (!SUPPORTED_LANGUAGES[language].requiresOTP) {
       // Directly update language preference
-      await db.collection("users").doc(uid).update({
+      await db.collection("users").doc(uid).set({
+        uid,
+        email,
         language,
         languageChangedAt: new Date(),
-      });
+      }, { merge: true });
 
       return res.status(200).json({
         message: `Language changed to ${SUPPORTED_LANGUAGES[language].nativeName}`,
