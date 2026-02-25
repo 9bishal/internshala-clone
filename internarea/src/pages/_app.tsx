@@ -6,7 +6,7 @@ import { store } from "../store/store";
 import { Provider, useDispatch } from "react-redux";
 import { useEffect, useRef } from "react";
 import { auth } from "@/firebase/firebase";
-import { login, logout } from "@/Feature/Userslice";
+import { login, logout, setLanguage } from "@/Feature/Userslice";
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import axios from 'axios';
@@ -58,6 +58,15 @@ function AuthListener() {
   const hasRecordedLogin = useRef(false);
   const hasSyncedUser = useRef(false);
 
+  // Load language from localStorage once on client mount to avoid hydration mismatch
+  // This will apply the last saved language FOR THE LOGGED-IN USER immediately on refresh
+  useEffect(() => {
+    const savedLang = localStorage.getItem('preferredLanguage');
+    if (savedLang) {
+      dispatch(setLanguage(savedLang));
+    }
+  }, [dispatch]);
+
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged(async (authuser) => {
       if (authuser) {
@@ -71,11 +80,26 @@ function AuthListener() {
           })
         );
         
-        // Only sync user data ONCE per component mount
+        // Initial language from localStorage/default
+        let currentLanguage = typeof window !== 'undefined' ? (localStorage.getItem('preferredLanguage') || "en") : "en";
+
+        // Fetch user preferences and sync ONCE per component mount (on refresh)
         if (!hasSyncedUser.current) {
           hasSyncedUser.current = true;
 
           try {
+            // 1. Fetch language preference from DB to ensure it matches account settings
+            const langRes = await axios.get(
+              getApiEndpoint(`/language/preference/${authuser.uid}`)
+            );
+            
+            if (langRes.data && langRes.data.currentLanguage) {
+              currentLanguage = langRes.data.currentLanguage;
+              dispatch(setLanguage(currentLanguage));
+              // Note: setLanguage reducer updates localStorage automatically
+            }
+
+            // 2. Sync user data (identity)
             await axios.post(
               getApiEndpoint("/auth/sync-user"), 
               {
@@ -87,7 +111,7 @@ function AuthListener() {
               { timeout: 10000 }
             );
           } catch (error: any) {
-            console.error("Failed to sync user data:", error.message);
+            console.error("AuthListener Initialization Error:", error.message);
           }
         }
 
@@ -95,7 +119,6 @@ function AuthListener() {
         const sessionKey = `login_recorded_${authuser.uid}`;
         if (
           !hasRecordedLogin.current &&
-          typeof window !== 'undefined' &&
           !sessionStorage.getItem(sessionKey)
         ) {
           hasRecordedLogin.current = true;
@@ -118,6 +141,7 @@ function AuthListener() {
                 email: authuser.email,
                 ipAddress: ipAddress,
                 deviceInfo,
+                language: currentLanguage,
               },
               { timeout: 10000 }
             );
@@ -126,7 +150,17 @@ function AuthListener() {
           }
         }
       } else {
+        // User is logged out or a guest
         dispatch(logout());
+        
+        // Force language to English for guest visits
+        dispatch(setLanguage("en"));
+        
+        // Clear the preference so a new visitor/guest doesn't inherit a previous user's language
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('preferredLanguage');
+        }
+        
         hasSyncedUser.current = false;
         hasRecordedLogin.current = false;
       }

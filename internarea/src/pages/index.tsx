@@ -11,14 +11,18 @@ import {
   Calendar,
   ChevronRight,
   MapPin,
+  CheckCircle2,
 } from "lucide-react";
 import Link from "next/link";
 import axios from "axios";
 import { useSelector } from "react-redux";
-import { selectuser } from "@/Feature/Userslice";
+import { selectuser, selectLanguage } from "@/Feature/Userslice";
+import { useTranslation } from "@/utils/i18n";
 
 export default function SvgSlider() {
   const user = useSelector(selectuser);
+  const language = useSelector(selectLanguage) || "en";
+  const { t } = useTranslation(language);
   const categories = [
     "Big Brands",
     "Work From Home",
@@ -119,22 +123,30 @@ export default function SvgSlider() {
   ];
   const [internships, setinternship] = useState<any>([]);
   const [jobs, setjob] = useState<any>([]);
+  const [appliedIds, setAppliedIds] = useState<string[]>([]);
   useEffect(() => {
     const fetchdata = async () => {
       try {
-        const [internshipres, jobres] = await Promise.all([
+        const [internshipres, jobres, appRes] = await Promise.all([
           axios.get(getApiEndpoint("/internship")),
           axios.get(getApiEndpoint("/job")),
+          user?.uid ? axios.get(getApiEndpoint("/application")) : Promise.resolve({ data: [] }),
         ]);
         setinternship(internshipres.data);
         setjob(jobres.data);
+        if (user?.uid && appRes.data) {
+          const uApps = appRes.data.filter((app: any) => 
+            app.user?.uid === user.uid || app.user?.name === user.name || app.user?.email === user.email
+          );
+          setAppliedIds(uApps.map((app: any) => app.Application));
+        }
         console.log("✅ Home page data fetched successfully");
       } catch (error) {
         console.error("❌ Error fetching home data:", error);
       }
     };
     fetchdata();
-  }, []);
+  }, [user]);
   const [selectedCategory, setSelectedCategory] = useState("");
   const filteredInternships = internships.filter((item: any) => {
     // Filter out user's own internship postings
@@ -155,9 +167,9 @@ export default function SvgSlider() {
       {/* hero section */}
       <div className="text-center mb-12">
         <h1 className="text-4xl font-bold text-gray-900 mb-4">
-          Make your dream career a reality
+          {t('make_dream_career')}
         </h1>
-        <p className="text-xl text-gray-600">Trending on InternArea 🔥</p>
+        <p className="text-xl text-gray-600">{t('trending_internarea')}</p>
       </div>
       {/* Swiper section */}
       <div className="mb-16">
@@ -257,10 +269,10 @@ export default function SvgSlider() {
       {/* Category section */}
       <div className="mb-12">
         <h2 className="text-2xl font-bold text-gray-900 mb-6">
-          Latest internships on Intern Area
+          {t('latest_internships')}
         </h2>
         <div className="flex flex-wrap gap-4">
-          <span className="text-gray-700 font-medium">POPULAR CATEGORIES:</span>
+          <span className="text-gray-700 font-medium">{t('popular_categories')}</span>
           {categories.map((category) => (
             <button
               key={category}
@@ -285,7 +297,7 @@ export default function SvgSlider() {
           >
             <div className="flex items-center gap-2 text-blue-600 mb-4">
               <ArrowUpRight size={20} />
-              <span className="font-medium">Actively Hiring</span>
+              <span className="font-medium">{t('actively_hiring')}</span>
             </div>
             <h3 className="text-lg font-semibold mb-2 text-gray-800">
               {internship.title}
@@ -309,20 +321,27 @@ export default function SvgSlider() {
               <span className="px-3 py-1 bg-gray-100 text-gray-600 rounded-full text-sm">
                 Internship
               </span>
-              <Link
-                href={`/detailiternship/${internship._id}`}
-                className="text-blue-600 hover:text-blue-700 flex items-center gap-1"
-              >
-                View details
-                <ChevronRight size={16} />
-              </Link>
+              <div className="flex items-center gap-3">
+                {appliedIds.includes(internship._id) ? (
+                  <span className="text-green-600 font-semibold text-sm flex items-center gap-1">
+                    <CheckCircle2 size={16} /> Applied
+                  </span>
+                ) : null}
+                <Link
+                  href={`/detailiternship/${internship._id}`}
+                  className="text-blue-600 hover:text-blue-700 flex items-center gap-1"
+                >
+                  {t('view_details')}
+                  <ChevronRight size={16} />
+                </Link>
+              </div>
             </div>
           </div>
         ))}
       </div>
       {/* Jobs grid   */}
       <div className="mb-12">
-        <h2 className="text-2xl font-bold text-gray-900 mb-6">Latest Jobs</h2>
+        <h2 className="text-2xl font-bold text-gray-900 mb-6">{t('latest_jobs')}</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-16">
           {filteredJobs.map((job: any, index: any) => (
             <div
@@ -331,7 +350,7 @@ export default function SvgSlider() {
             >
               <div className="flex items-center gap-2 text-blue-600 mb-4">
                 <ArrowUpRight size={20} />
-                <span className="font-medium">Actively Hiring</span>
+                <span className="font-medium">{t('actively_hiring')}</span>
               </div>
               <h3 className="text-lg font-semibold mb-2 text-gray-800">
                 {job.title}
@@ -355,13 +374,20 @@ export default function SvgSlider() {
                 <span className="px-3 py-1 bg-gray-100 text-gray-600 rounded-full text-sm">
                   Jobs
                 </span>
-                <Link
-                  href={`/detailjob/${job._id}`}
-                  className="text-blue-600 hover:text-blue-700 flex items-center gap-1"
-                >
-                  View details
-                  <ChevronRight size={16} />
-                </Link>
+                <div className="flex items-center gap-3">
+                  {appliedIds.includes(job._id) ? (
+                    <span className="text-green-600 font-semibold text-sm flex items-center gap-1">
+                      <CheckCircle2 size={16} /> Applied
+                    </span>
+                  ) : null}
+                  <Link
+                    href={`/detailjob/${job._id}`}
+                    className="text-blue-600 hover:text-blue-700 flex items-center gap-1"
+                  >
+                    {t('view_details')}
+                    <ChevronRight size={16} />
+                  </Link>
+                </div>
               </div>
             </div>
           ))}

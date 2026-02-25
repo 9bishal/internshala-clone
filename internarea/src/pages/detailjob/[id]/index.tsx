@@ -122,23 +122,79 @@ const index = () => {
   const user=useSelector(selectuser)
   const router = useRouter();
   const { id } = router.query;
-  const [jobdata, setjob] = useState<any>([]);
+  const [jobdata, setjob] = useState<any>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, seterror] = useState<string | null>(null);
+  const [userData, setUserData] = useState<any>(null);
+  const [includeResume, setIncludeResume] = useState(true);
+
   useEffect(() => {
     const fetchdata = async () => {
       try {
+        seterror(null);
         const res = await axios.get(getApiEndpoint(`/job/${id}`));
         setjob(res.data);
         console.log("✅ Job detail fetched:", res.data);
-      } catch (error) {
+
+        // Fetch user data if logged in
+        if (user?.uid) {
+          try {
+            const userRes = await axios.get(getApiEndpoint(`/users/${user.uid}`));
+            setUserData(userRes.data);
+          } catch (e) {
+            console.error("Error fetching user data:", e);
+          }
+        }
+      } catch (error: any) {
         console.error("❌ Error fetching job detail:", error);
+        seterror(error.response?.data?.error || "Job not found");
       }
     };
-    fetchdata();
-  }, [id]);
+    if (id) fetchdata();
+  }, [id, user]);
 
   const [availability, setAvailability] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [coverLetter, setCoverLetter] = useState("");
+  const [hasApplied, setHasApplied] = useState(false);
+
+  useEffect(() => {
+    const checkIfApplied = async () => {
+      if (user?.uid && id) {
+        try {
+          const appRes = await axios.get(getApiEndpoint("/application"));
+          const appliedIds = appRes.data
+            .filter((app: any) => app.user?.uid === user.uid || app.user?.name === user.name || app.user?.email === user.email)
+            .map((app: any) => app.Application);
+          
+          if (appliedIds.includes(id as string)) {
+            setHasApplied(true);
+          }
+        } catch (error) {
+          console.error("Error checking application status:", error);
+        }
+      }
+    };
+    checkIfApplied();
+  }, [user, id]);
+  if (error) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center p-4">
+        <div className="bg-red-50 border border-red-200 rounded-lg p-8 text-center max-w-md">
+          <div className="text-4xl mb-4">⚠️</div>
+          <h2 className="text-xl font-bold text-red-800 mb-2">Error</h2>
+          <p className="text-red-600 mb-6">{error}</p>
+          <button
+            onClick={() => router.push("/job")}
+            className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+          >
+            Back to Jobs
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   if (!jobdata) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -156,6 +212,7 @@ const index = () => {
       return;
     }
     try {
+      setIsSubmitting(true);
       const applicationdata = {
         category: jobdata.category,
         company: jobdata.company,
@@ -163,17 +220,21 @@ const index = () => {
         user: user,
         Application: id,
         availability,
+        resumeId: includeResume ? userData?.resumeId : null,
       };
       await axios.post(
         getApiEndpoint("/application"),
         applicationdata
       );
       toast.success("Application submit successfully");
-      router.push("/job");
+      setHasApplied(true);
+      setIsModalOpen(false);
     } catch (error: any) {
       console.error(error);
       const errorMessage = error.response?.data?.error || error.response?.data?.message || "Failed to submit application";
       toast.error(errorMessage);
+    } finally {
+      setIsSubmitting(false);
     }
   };
   return (
@@ -253,6 +314,11 @@ const index = () => {
               <CheckCircle2 className="h-5 w-5" />
               <span>You posted this job</span>
             </div>
+          ) : hasApplied ? (
+            <div className="bg-green-100 text-green-700 px-8 py-3 rounded-lg flex items-center space-x-2">
+              <CheckCircle2 className="h-5 w-5" />
+              <span className="font-semibold">You have already applied</span>
+            </div>
           ) : (
             <button
               onClick={() => {
@@ -289,13 +355,36 @@ const index = () => {
             </div>
             <div className="p-6 space-y-6">
               {/* Resume Section */}
-              <div>
+              <div className="bg-gray-50 border rounded-lg p-4">
                 <h3 className="text-lg font-semibold text-gray-900 mb-2">
                   Your Resume
                 </h3>
-                <p className="text-gray-600">
-                  Your current resume will be submitted with the application
-                </p>
+                {userData?.resumeId ? (
+                  <div className="flex flex-col gap-3">
+                    <div className="flex items-center justify-between bg-white p-3 border rounded">
+                      <div className="flex items-center gap-2 text-sm sm:text-base">
+                        <CheckCircle2 className="w-5 h-5 text-green-500" />
+                        <span className="font-medium text-gray-800">Default Resume Attached</span>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
+                          <input 
+                            type="checkbox" 
+                            checked={includeResume} 
+                            onChange={(e) => setIncludeResume(e.target.checked)}
+                            className="w-4 h-4 text-blue-600 hover:cursor-pointer"
+                          />
+                          Include
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-gray-600 text-sm sm:text-base">
+                    <p className="mb-2">You don't have a default resume attached to your profile.</p>
+                    <p className="text-sm">You can <Link href="/resume/create" className="text-blue-600 hover:underline font-medium">create one</Link> or proceed without it (optional).</p>
+                  </div>
+                )}
               </div>
               <div>
                 <h3 className="text-lg font-semibold text-gray-900 mb-2">
@@ -340,10 +429,18 @@ const index = () => {
               <div className="flex justify-end pt-4">
                 {user ? (
                   <button
-                    className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700"
+                    disabled={isSubmitting}
+                    className={`bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 flex items-center space-x-2 transition-all duration-200 ${isSubmitting ? 'opacity-70 cursor-not-allowed' : ''}`} 
                     onClick={handlesubmitapplication}
                   >
-                    Submit Application
+                    {isSubmitting ? (
+                      <>
+                        <div className="animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full"></div>
+                        <span>Submitting...</span>
+                      </>
+                    ) : (
+                      <span>Submit Application</span>
+                    )}
                   </button>
                 ) : (
                   <Link

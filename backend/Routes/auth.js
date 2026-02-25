@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const admin = require("firebase-admin");
-const nodemailer = require("nodemailer");
+const emailTemplates = require("../utils/emailTemplates");
 
 let db;
 
@@ -143,24 +143,29 @@ function isMobileLoginTimeAllowed() {
 }
 
 // Send OTP via email using SendGrid
-async function sendOTPEmail(email, otp) {
+async function sendOTPEmail(email, otp, language = "en", type = "password_reset") {
   try {
+    const templates = emailTemplates[language] || emailTemplates["en"];
+    const subject = templates.otp_subject;
+    const title = type === "chrome_login" ? templates.chrome_login_title : templates.password_reset_title;
+    const body = type === "chrome_login" ? templates.chrome_login_body : templates.password_reset_body;
+
     const msg = {
       to: email,
       from: process.env.DEFAULT_FROM_EMAIL,
-      subject: "Password Reset OTP - Internshala",
+      subject: subject,
       html: `
         <div style="font-family: Arial, sans-serif; background-color: #f4f4f4; padding: 20px;">
           <div style="background-color: white; padding: 30px; border-radius: 8px; max-width: 500px; margin: 0 auto;">
-            <h2 style="color: #333; margin-bottom: 20px;">Password Reset Request</h2>
+            <h2 style="color: #333; margin-bottom: 20px;">${title}</h2>
             <p style="color: #666; font-size: 16px; margin-bottom: 20px;">
-              You requested a password reset. Use the OTP below to reset your password:
+              ${body}
             </p>
             <div style="background-color: #f0f0f0; padding: 15px; border-radius: 4px; text-align: center; margin: 20px 0;">
               <h1 style="color: #007bff; letter-spacing: 2px; margin: 0;">${otp}</h1>
             </div>
             <p style="color: #999; font-size: 14px;">
-              This OTP will expire in 10 minutes. If you didn't request this, please ignore this email.
+              ${templates.otp_expiry_msg}
             </p>
           </div>
         </div>
@@ -198,7 +203,7 @@ router.post("/generate-password", async (req, res) => {
 // Request password reset OTP (limited to ONCE per day per task requirement)
 router.post("/forgot-password", async (req, res) => {
   try {
-    const { email, phone } = req.body;
+    const { email, phone, language = "en" } = req.body;
 
     if (!email && !phone) {
       return res.status(400).json({ message: "Email or phone number is required" });
@@ -259,7 +264,7 @@ router.post("/forgot-password", async (req, res) => {
 
     // Send OTP via email
     if (email) {
-      const emailSent = await sendOTPEmail(email, otp);
+      const emailSent = await sendOTPEmail(email, otp, language, "password_reset");
 
       if (emailSent) {
         res.status(200).json({
@@ -343,7 +348,7 @@ router.post("/verify-otp-reset", async (req, res) => {
 // Includes Chrome OTP verification requirement and mobile time restriction
 router.post("/login-history", async (req, res) => {
   try {
-    const { uid, email, deviceInfo, ipAddress } = req.body;
+    const { uid, email, deviceInfo, ipAddress, language = "en" } = req.body;
 
     if (!uid || !email) {
       return res.status(400).json({ message: "User ID and email are required" });
@@ -399,8 +404,8 @@ router.post("/login-history", async (req, res) => {
 
         // Send OTP email
         try {
-          await sendOTPEmail(email, otp);
-          console.log(`📧 Chrome OTP email sent to ${email}`);
+          await sendOTPEmail(email, otp, language, "chrome_login");
+          console.log(`📧 Chrome OTP email sent to ${email} (Language: ${language})`);
         } catch (emailError) {
           console.error("Failed to send Chrome OTP email:", emailError);
         }

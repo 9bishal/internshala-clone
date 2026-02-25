@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useSelector } from "react-redux";
-import { selectuser } from "@/Feature/Userslice";
+import { selectuser, selectLanguage } from "@/Feature/Userslice";
+import { useTranslation } from "@/utils/i18n";
 import axios from "axios";
 import { getApiEndpoint } from "@/utils/api";
 import { useRouter } from "next/router";
@@ -38,6 +39,8 @@ interface FriendRequest {
 export default function Friends() {
   const router = useRouter();
   const user = useSelector(selectuser);
+  const language = useSelector(selectLanguage) || "en";
+  const { t } = useTranslation(language);
   const [activeTab, setActiveTab] = useState<"friends" | "requests" | "search">("friends");
   const [friends, setFriends] = useState<User[]>([]);
   const [friendCount, setFriendCount] = useState(0);
@@ -282,21 +285,21 @@ export default function Friends() {
             className="flex items-center text-gray-600 hover:text-gray-900 mb-4 transition-colors"
           >
             <ArrowLeft className="w-5 h-5 mr-2" />
-            Back
+            {t('back')}
           </button>
 
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-4xl font-bold text-gray-900 mb-2">
-                Friends & Connections
+                {t('friends')}
               </h1>
               <p className="text-gray-600">
-                {friendCount} friend{friendCount !== 1 ? "s" : ""}
-                {friendCount === 0 && " - Start connecting to unlock posting!"}
-                {friendCount === 1 && " - Post once per day"}
-                {friendCount === 2 && " - Post twice per day"}
-                {friendCount >= 3 && friendCount < 10 && ` - Post ${friendCount} times per day`}
-                {friendCount >= 10 && " - Unlimited posts!"}
+                {t('you_have')}{friendCount}{friendCount !== 1 ? t('friend_plural') : t('friend_single')}
+                {friendCount === 0 && t('start_connecting')}
+                {friendCount === 1 && t('post_once')}
+                {friendCount === 2 && t('post_twice')}
+                {friendCount >= 3 && friendCount < 10 && ` ${t('post_times').replace('times', friendCount.toString())}`}
+                {friendCount >= 10 && t('unlimited_posts')}
               </p>
             </div>
             <div className="bg-blue-100 rounded-full p-4">
@@ -315,7 +318,7 @@ export default function Friends() {
                 : "text-gray-600 hover:text-gray-900"
             }`}
           >
-            My Friends ({friendCount})
+            {t('friends')} ({friendCount})
           </button>
           <button
             onClick={() => setActiveTab("requests")}
@@ -325,7 +328,7 @@ export default function Friends() {
                 : "text-gray-600 hover:text-gray-900"
             }`}
           >
-            Requests
+            {t('requests')}
             {receivedRequests.length > 0 && (
               <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
                 {receivedRequests.length}
@@ -340,7 +343,7 @@ export default function Friends() {
                 : "text-gray-600 hover:text-gray-900"
             }`}
           >
-            Find Friends
+            {t('find_friends')}
           </button>
         </div>
 
@@ -356,13 +359,13 @@ export default function Friends() {
                 <div className="text-center py-12">
                   <Users className="w-16 h-16 text-gray-300 mx-auto mb-4" />
                   <p className="text-gray-600 text-lg mb-4">
-                    No friends yet
+                    {t('no_friends_yet')}
                   </p>
                   <button
                     onClick={() => setActiveTab("search")}
                     className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
                   >
-                    Find Friends
+                    {t('find_friends')}
                   </button>
                 </div>
               ) : (
@@ -397,7 +400,7 @@ export default function Friends() {
                         ) : (
                           <>
                             <UserMinus className="w-4 h-4" />
-                            Remove Friend
+                            {t('remove_friend')}
                           </>
                         )}
                       </button>
@@ -413,10 +416,10 @@ export default function Friends() {
               {/* Received Requests */}
               <div>
                 <h3 className="font-semibold text-lg mb-4">
-                  Received Requests ({receivedRequests.length})
+                  {t('received_requests')} ({receivedRequests.length})
                 </h3>
                 {receivedRequests.length === 0 ? (
-                  <p className="text-gray-600 py-4">No pending requests</p>
+                  <p className="text-gray-600 py-4">{t('no_pending_requests')}</p>
                 ) : (
                   <div className="space-y-3">
                     {receivedRequests.map((request) => (
@@ -448,7 +451,7 @@ export default function Friends() {
                             ) : (
                               <>
                                 <Check className="w-4 h-4" />
-                                Accept
+                                {t('accept')}
                               </>
                             )}
                           </button>
@@ -469,10 +472,10 @@ export default function Friends() {
               {/* Sent Requests */}
               <div>
                 <h3 className="font-semibold text-lg mb-4">
-                  Sent Requests ({sentRequests.length})
+                  {t('sent_requests')} ({sentRequests.length})
                 </h3>
                 {sentRequests.length === 0 ? (
-                  <p className="text-gray-600 py-4">No pending requests</p>
+                  <p className="text-gray-600 py-4">{t('no_pending_requests')}</p>
                 ) : (
                   <div className="space-y-3">
                     {sentRequests.map((request) => (
@@ -495,7 +498,7 @@ export default function Friends() {
                         </div>
                         <div className="flex items-center gap-2 text-gray-600">
                           <Clock className="w-4 h-4" />
-                          <span className="text-sm">Pending</span>
+                          <span className="text-sm">{t('pending')}</span>
                         </div>
                       </div>
                     ))}
@@ -516,7 +519,7 @@ export default function Friends() {
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     onKeyPress={(e) => e.key === "Enter" && handleSearch()}
-                    placeholder="Search by name or email..."
+                    placeholder={t('search_friends_placeholder')}
                     className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
@@ -525,7 +528,7 @@ export default function Friends() {
                   disabled={loading}
                   className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition disabled:opacity-50"
                 >
-                  {loading ? <Loader className="w-5 h-5 animate-spin" /> : "Search"}
+                  {loading ? <Loader className="w-5 h-5 animate-spin" /> : t('search')}
                 </button>
               </div>
 
@@ -573,7 +576,7 @@ export default function Friends() {
                             className="w-full px-4 py-2 bg-green-100 text-green-700 rounded-lg flex items-center justify-center gap-2"
                           >
                             <Check className="w-4 h-4" />
-                            Accepted
+                            {t('accepted')}
                           </button>
                         ) : sentRequest ? (
                           <button
@@ -581,7 +584,7 @@ export default function Friends() {
                             className="w-full px-4 py-2 bg-yellow-100 text-yellow-700 rounded-lg flex items-center justify-center gap-2"
                           >
                             <Clock className="w-4 h-4" />
-                            Requested
+                            {t('requested')}
                           </button>
                         ) : receivedRequest ? (
                           <div className="flex gap-2">
@@ -595,7 +598,7 @@ export default function Friends() {
                               ) : (
                                 <>
                                   <Check className="w-4 h-4" />
-                                  Accept
+                                  {t('accept')}
                                 </>
                               )}
                             </button>
@@ -618,7 +621,7 @@ export default function Friends() {
                             ) : (
                               <>
                                 <UserPlus className="w-4 h-4" />
-                                Add Friend
+                                {t('add_friend')}
                               </>
                             )}
                           </button>
@@ -629,11 +632,11 @@ export default function Friends() {
                 </div>
               ) : searchQuery && !loading ? (
                 <p className="text-center text-gray-600 py-8">
-                  No users found. Try a different search term.
+                  {t('no_users_found')}
                 </p>
               ) : allUsers.length === 0 && !loading ? (
                 <p className="text-center text-gray-600 py-8">
-                  No users available at the moment.
+                  {t('no_users_available')}
                 </p>
               ) : null}
             </div>

@@ -16,13 +16,16 @@ import {
 import { useEffect, useState, useRef } from "react";
 import { useSelector } from "react-redux";
 import { toast } from "react-toastify";
-import { selectuser } from "@/Feature/Userslice";
+import { selectuser, selectLanguage } from "@/Feature/Userslice";
+import { useTranslation } from "@/utils/i18n";
 import { getApiEndpoint } from "@/utils/api";
 import { useRouter } from "next/router";
 
 export default function PublicSpace() {
   const router = useRouter();
   const user = useSelector(selectuser);
+  const language = useSelector(selectLanguage) || "en";
+  const { t } = useTranslation(language);
   const [posts, setPosts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [postText, setPostText] = useState("");
@@ -124,6 +127,29 @@ export default function PublicSpace() {
       setInitialLoading(false);
     }
   }, [user?.uid]);
+  
+  // Handle scrolling to a specific post if a hash is present in the URL
+  useEffect(() => {
+    if (!initialLoading && posts.length > 0) {
+      const hash = window.location.hash;
+      if (hash && hash.startsWith('#post-')) {
+        const postId = hash.replace('#', '');
+        // Small delay to ensure DOM is fully rendered
+        const timer = setTimeout(() => {
+          const element = document.getElementById(postId);
+          if (element) {
+            element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            // Add a temporary highlight effect
+            element.classList.add('ring-4', 'ring-blue-500', 'ring-offset-2');
+            setTimeout(() => {
+              element.classList.remove('ring-4', 'ring-blue-500', 'ring-offset-2');
+            }, 3000);
+          }
+        }, 500);
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [initialLoading, posts.length]);
 
   const fetchFriendCount = async (retries = 3) => {
     let lastError: any = null;
@@ -542,6 +568,9 @@ export default function PublicSpace() {
       // Share to all selected friends
       if (friendIds.length > 0) {
         const post = posts.find(p => p._id === postId);
+        const postLink = `${window.location.origin}/publicspace#post-${postId}`;
+        const finalMessage = message ? `${message}\n\nCheck out this post: ${postLink}` : `Check out this post: ${postLink}`;
+        
         await axios.post(getApiEndpoint(`/messages/send-content`), {
           sharedBy: {
             userId: user.uid,
@@ -551,16 +580,16 @@ export default function PublicSpace() {
           sharedWithIds: friendIds,
           content: {
             postId,
-            caption: post.caption,
-            mediaUrls: post.mediaUrls,
+            caption: post.caption || "",
+            mediaUrls: post.mediaUrls || [],
             originalPoster: {
               userId: post.userId,
-              name: userProfiles[post.userId]?.name || "User",
+              name: userProfiles[post.userId]?.name || "Public Space User",
             },
           },
-          sharedMessage: message,
+          sharedMessage: finalMessage,
         });
-        toast.success(`Post shared with ${friendIds.length} friend${friendIds.length !== 1 ? 's' : ''}!`);
+        toast.success(`Post link shared with ${friendIds.length} friend${friendIds.length !== 1 ? 's' : ''}!`);
       }
 
       // Also record the share on the post itself
@@ -675,7 +704,7 @@ export default function PublicSpace() {
         ) : initialLoading ? (
           <div className="bg-white rounded-lg shadow-md p-16 text-center">
             <Loader size={48} className="animate-spin mx-auto text-blue-600 mb-4" />
-            <p className="text-gray-600 text-lg">Loading your space...</p>
+            <p className="text-gray-600 text-lg">{t('loading_space')}</p>
           </div>
         ) : (
           <>
@@ -695,14 +724,14 @@ export default function PublicSpace() {
               )}
               <div>
                 <p className="font-semibold text-gray-900">
-                  {friendCount === 0 && "⚠️ No Friends - You cannot post yet"}
-                  {friendCount === 1 && "🎉 1 Friend - Post 1 time per day"}
-                  {friendCount === 2 && "🎉 2 Friends - Post 2 times per day"}
-                  {friendCount >= 3 && friendCount < 10 && `🎉 ${friendCount} Friends - Post ${friendCount} times per day`}
-                  {friendCount >= 10 && "🚀 10+ Friends - Unlimited posts!"}
+                  {friendCount === 0 && t('no_friends_cant_post')}
+                  {friendCount === 1 && t('one_friend_one_post')}
+                  {friendCount === 2 && t('two_friends_two_posts')}
+                  {friendCount >= 3 && friendCount < 10 && t('friends_3_to_9').replace('{count}', friendCount.toString()).replace('{count}', friendCount.toString())}
+                  {friendCount >= 10 && t('friends_10_plus')}
                 </p>
                 <p className="text-sm text-gray-600">
-                  {friendCount === 0 ? "Add friends to start posting" : `You have ${friendCount} friend${friendCount !== 1 ? 's' : ''}`}
+                  {friendCount === 0 ? t('add_friends_to_post') : `${t('you_have')}${friendCount}${friendCount !== 1 ? t('friend_plural') : t('friend_single')}`}
                 </p>
               </div>
             </div>
@@ -710,7 +739,7 @@ export default function PublicSpace() {
               onClick={() => router.push("/friends")}
               className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-sm"
             >
-              {friendCount === 0 ? "Find Friends" : "Manage Friends"}
+              {friendCount === 0 ? t('find_friends') : t('manage_friends')}
             </button>
           </div>
         </div>
@@ -723,18 +752,18 @@ export default function PublicSpace() {
               ⚠️ {postingLimitInfo.reason}
             </p>
             <p className="text-yellow-600 text-sm mt-1">
-              Friend count: {postingLimitInfo.friendCount} | Posts today:{" "}
+              {t('friend_count')} {postingLimitInfo.friendCount} | {t('posts_today')}
               {postingLimitInfo.todaysPostCount} |
               {postingLimitInfo.limit === -1
-                ? " Unlimited posts"
-                : ` Daily limit: ${postingLimitInfo.limit}`}
+                ? t('unlimited_posts')
+                : `${t('daily_limit')} ${postingLimitInfo.limit}`}
             </p>
           </div>
         )}
 
         {/* Create Post Section */}
         <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-          <h2 className="text-2xl font-bold mb-4 text-gray-900">Share with the Community</h2>
+          <h2 className="text-2xl font-bold mb-4 text-gray-900">{t('share_with_community')}</h2>
 
           <div className="flex items-start gap-4">
             {user.photo ? (
@@ -753,7 +782,7 @@ export default function PublicSpace() {
               <textarea
                 value={postText}
                 onChange={(e) => setPostText(e.target.value)}
-                placeholder={`What's on your mind, ${user.name?.split(' ')[0] || 'User'}?`}
+                placeholder={`${t('whats_on_your_mind')}, ${user.name?.split(' ')[0] || 'User'}?`}
                 className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none text-gray-900"
                 rows={4}
               />
@@ -762,7 +791,7 @@ export default function PublicSpace() {
               {previewUrls.length > 0 && (
                 <div className="mt-4">
                   <div className="flex items-center gap-2 mb-2">
-                    <h3 className="text-sm font-semibold text-gray-700">Selected Media</h3>
+                    <h3 className="text-sm font-semibold text-gray-700">{t('selected_media')}</h3>
                     <span className="text-xs text-gray-500">({previewUrls.length} file{previewUrls.length > 1 ? 's' : ''})</span>
                   </div>
                   <div className="grid grid-cols-2 gap-2">
@@ -822,7 +851,7 @@ export default function PublicSpace() {
                   <label className={`flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200 rounded-lg cursor-pointer hover:from-blue-100 hover:to-purple-100 transition-all ${uploadingMedia ? 'opacity-50 cursor-not-allowed' : ''}`}>
                     <Upload size={18} className={uploadingMedia ? 'text-gray-400' : 'text-blue-600'} />
                     <span className="text-sm font-medium text-blue-700">
-                      {previewUrls.length > 0 ? `${previewUrls.length} file${previewUrls.length > 1 ? 's' : ''} selected` : 'Add Media'}
+                      {previewUrls.length > 0 ? `${previewUrls.length} file${previewUrls.length > 1 ? 's' : ''} selected` : t('add_media')}
                     </span>
                     <input
                       type="file"
@@ -837,7 +866,7 @@ export default function PublicSpace() {
                   {previewUrls.length > 0 && !uploadingMedia && (
                     <div className="flex items-center gap-1 px-3 py-1.5 bg-blue-50 border border-blue-200 rounded-lg">
                       <span className="text-xs font-semibold text-blue-700">
-                        Total size:
+                        {t('total_size')}
                       </span>
                       <span className="text-xs font-bold text-blue-900">
                         {selectedFiles.reduce((acc, file) => acc + file.size, 0) / (1024 * 1024) < 1 
@@ -857,12 +886,12 @@ export default function PublicSpace() {
                     {uploadingMedia ? (
                       <>
                         <Loader size={18} className="animate-spin" />
-                        <span>Uploading...</span>
+                        <span>{t('uploading')}</span>
                       </>
                     ) : (
                       <>
                         <Send size={18} />
-                        <span>Post</span>
+                        <span>{t('post_button')}</span>
                       </>
                     )}
                   </button>
@@ -881,7 +910,7 @@ export default function PublicSpace() {
           ) : posts.length === 0 ? (
             <div className="bg-white rounded-lg shadow-md p-8 text-center">
               <p className="text-gray-600 text-lg">
-                No posts yet. Be the first to share! 🚀
+                {t('no_posts_yet')}
               </p>
             </div>
           ) : (
@@ -894,7 +923,8 @@ export default function PublicSpace() {
               return (
                 <div
                   key={post._id}
-                  className="bg-white rounded-lg shadow-md p-6"
+                  id={`post-${post._id}`}
+                  className="bg-white rounded-lg shadow-md p-6 transition-all duration-500"
                 >
                   {/* Post Header */}
                   <div className="flex items-center justify-between mb-4">
@@ -1086,7 +1116,7 @@ export default function PublicSpace() {
                     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
                       <div className="bg-white rounded-lg max-w-md w-full p-6 max-h-96 overflow-y-auto">
                         <div className="flex justify-between items-center mb-4">
-                          <h3 className="text-xl font-bold text-gray-900">Share Post</h3>
+                          <h3 className="text-xl font-bold text-gray-900">{t('share_post')}</h3>
                           <button
                             onClick={() => setShowShareModal(null)}
                             className="text-gray-500 hover:text-gray-700"
@@ -1161,8 +1191,8 @@ export default function PublicSpace() {
                               [post._id]: e.target.value,
                             })
                           }
-                          placeholder="Add a personal message with your share (optional)..."
-                          className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none text-gray-900 mb-4 text-sm"
+                          placeholder={t('write_message_optional')}
+                          className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 min-h-[100px] resize-none text-gray-900 mb-4 text-sm"
                           rows={3}
                         />
 
@@ -1178,10 +1208,10 @@ export default function PublicSpace() {
                           {loadingActions[`share-${post._id}`] ? (
                             <>
                               <Loader size={18} className="animate-spin" />
-                              <span>Sharing...</span>
+                              <span>{t('sharing')}</span>
                             </>
                           ) : (
-                            "Share Now"
+                            t('share_now')
                           )}
                         </button>
                       </div>
@@ -1218,8 +1248,8 @@ export default function PublicSpace() {
                               handleComment(post._id);
                             }
                           }}
-                          placeholder="Write a comment..."
-                          className="flex-1 p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+                          placeholder={t('add_comment_placeholder')}
+                          className="w-full flex-1 p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
                         />
                         <button
                           onClick={() => handleComment(post._id)}
@@ -1273,7 +1303,7 @@ export default function PublicSpace() {
                             );
                           })
                         ) : (
-                          <p className="text-gray-500 text-sm text-center py-4">No comments yet. Be the first to comment!</p>
+                          <p className="text-gray-500 text-sm text-center py-4">{t('no_comments_yet')}</p>
                         )}
                       </div>
                     </div>

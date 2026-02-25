@@ -59,6 +59,19 @@ router.post("/", async (req, res) => {
         message: "Users cannot submit applications for jobs/internships they posted"
       });
     }
+
+    // Prevent duplicate applications
+    const existingApplication = await firestore()
+      .collection("applications")
+      .where("Application", "==", Application)
+      .where("user.uid", "==", user.uid)
+      .get();
+
+    if (!existingApplication.empty) {
+      return res.status(409).json({
+        error: "You have already applied for this role."
+      });
+    }
     
     const applicationData = {
       company: req.body.company,

@@ -18,6 +18,9 @@ import {
   CheckCircle,
 } from "lucide-react";
 import { toast } from "react-toastify";
+import { useSelector } from "react-redux";
+import { selectuser } from "@/Feature/Userslice";
+import { useEffect } from "react";
 
 export default function Register() {
   const router = useRouter();
@@ -28,6 +31,14 @@ export default function Register() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [registered, setRegistered] = useState(false);
+  const user = useSelector(selectuser);
+
+  // Redirect if already logged in
+  useEffect(() => {
+    if (user && !registered) {
+      router.push("/");
+    }
+  }, [user, router, registered]);
 
   const passwordChecks = {
     length: password.length >= 6,
@@ -86,8 +97,6 @@ export default function Register() {
         router.push("/");
       }, 2000);
     } catch (error: any) {
-      console.error("Registration error:", error);
-
       if (error.code === "auth/email-already-in-use") {
         toast.error("An account with this email already exists. Please login.");
       } else if (error.code === "auth/invalid-email") {
@@ -280,9 +289,16 @@ export default function Register() {
             <button
               type="submit"
               disabled={loading || !isFormValid}
-              className="w-full bg-gradient-to-r from-indigo-600 to-blue-600 text-white py-3 rounded-lg font-semibold hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full bg-gradient-to-r from-indigo-600 to-blue-600 text-white py-3 rounded-lg font-semibold hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
             >
-              {loading ? "Creating Account..." : "Create Account"}
+              {loading ? (
+                <>
+                  <div className="animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full"></div>
+                  <span>Creating Account...</span>
+                </>
+              ) : (
+                <span>Create Account</span>
+              )}
             </button>
 
             {/* Login Link */}

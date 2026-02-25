@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useSelector } from "react-redux";
-import { selectuser } from "@/Feature/Userslice";
+import { selectuser, selectLanguage } from "@/Feature/Userslice";
+import { useTranslation } from "@/utils/i18n";
 import axios from "axios";
 import { getApiEndpoint } from "@/utils/api";
 import { useRouter } from "next/router";
@@ -31,6 +32,8 @@ interface LoginRecord {
 export default function LoginHistory() {
   const router = useRouter();
   const user = useSelector(selectuser);
+  const language = useSelector(selectLanguage) || 'en';
+  const { t } = useTranslation(language);
   const [loginHistory, setLoginHistory] = useState<LoginRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [totalLogins, setTotalLogins] = useState(0);
@@ -62,7 +65,7 @@ export default function LoginHistory() {
   };
 
   const formatDate = (date: any) => {
-    if (!date) return "N/A";
+    if (!date) return t('not_available');
     
     try {
       let dateObj: Date;
@@ -82,7 +85,7 @@ export default function LoginHistory() {
       
       // Check if date is valid
       if (isNaN(dateObj.getTime())) {
-        return "Invalid Date";
+        return t('invalid_date');
       }
       
       return new Intl.DateTimeFormat("en-US", {
@@ -95,7 +98,7 @@ export default function LoginHistory() {
       }).format(dateObj);
     } catch (error) {
       console.error("Error formatting date:", error);
-      return "Invalid Date";
+      return t('invalid_date');
     }
   };
 
@@ -128,9 +131,9 @@ export default function LoginHistory() {
             <ArrowLeft className="w-6 h-6 text-gray-600" />
           </button>
           <div>
-            <h1 className="text-4xl font-bold text-gray-900">Login History</h1>
+            <h1 className="text-4xl font-bold text-gray-900">{t('login_history_title')}</h1>
             <p className="text-gray-600 mt-1">
-              View and manage your account security
+              {t('login_history_desc')}
             </p>
           </div>
         </div>
@@ -140,7 +143,7 @@ export default function LoginHistory() {
           <div className="bg-white rounded-lg shadow-md p-6 border-l-4 border-indigo-600">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-gray-600 text-sm">Total Logins</p>
+                <p className="text-gray-600 text-sm">{t('total_logins')}</p>
                 <p className="text-3xl font-bold text-gray-900 mt-2">
                   {totalLogins}
                 </p>
@@ -152,10 +155,10 @@ export default function LoginHistory() {
           <div className="bg-white rounded-lg shadow-md p-6 border-l-4 border-blue-600">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-gray-600 text-sm">Security Status</p>
+                <p className="text-gray-600 text-sm">{t('security_status')}</p>
                 <p className="text-2xl font-bold text-gray-900 mt-2 flex items-center gap-2">
                   <CheckCircle className="w-6 h-6 text-green-600" />
-                  Secure
+                  {t('secure')}
                 </p>
               </div>
             </div>
@@ -164,11 +167,11 @@ export default function LoginHistory() {
           <div className="bg-white rounded-lg shadow-md p-6 border-l-4 border-green-600">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-gray-600 text-sm">Last Login</p>
+                <p className="text-gray-600 text-sm">{t('last_login')}</p>
                 <p className="text-sm font-semibold text-gray-900 mt-2">
                   {loginHistory.length > 0
                     ? formatDate(loginHistory[0]?.timestamp)
-                    : "Never"}
+                    : t('never')}
                 </p>
               </div>
               <Clock className="w-10 h-10 text-green-600 opacity-20" />
@@ -183,11 +186,10 @@ export default function LoginHistory() {
               <AlertCircle className="w-6 h-6 text-red-600 flex-shrink-0 mt-0.5" />
               <div>
                 <h3 className="font-semibold text-red-900">
-                  Suspicious Activity Detected
+                  {t('suspicious_activity')}
                 </h3>
                 <p className="text-red-700 text-sm mt-1">
-                  We noticed some unusual login activity on your account. Review
-                  the details below and change your password if needed.
+                  {t('unusual_activity_desc')}
                 </p>
               </div>
             </div>
@@ -199,12 +201,12 @@ export default function LoginHistory() {
           {loading ? (
             <div className="text-center py-12">
               <RefreshCw className="w-8 h-8 text-gray-400 animate-spin mx-auto mb-4" />
-              <p className="text-gray-600">Loading login history...</p>
+              <p className="text-gray-600">{t('loading_history')}</p>
             </div>
           ) : loginHistory.length === 0 ? (
             <div className="bg-white rounded-lg shadow-md p-8 text-center">
               <Smartphone className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-              <p className="text-gray-600">No login history found</p>
+              <p className="text-gray-600">{t('no_history_found')}</p>
             </div>
           ) : (
             loginHistory.map((record, index) => (
@@ -220,11 +222,11 @@ export default function LoginHistory() {
                       {getDeviceIcon(record.deviceInfo)}
                       <div>
                         <h3 className="font-semibold text-gray-900 text-lg">
-                          {record.deviceInfo?.device || "Unknown Device"}
+                          {record.deviceInfo?.device || t('unknown_device')}
                         </h3>
                         <p className="text-gray-600 text-sm">
-                          {record.deviceInfo?.browser || "Unknown Browser"} •{" "}
-                          {record.deviceInfo?.os || "Unknown OS"}
+                          {record.deviceInfo?.browser || t('unknown_browser')} •{" "}
+                          {record.deviceInfo?.os || t('unknown_os')}
                         </p>
                       </div>
                     </div>
@@ -232,12 +234,12 @@ export default function LoginHistory() {
                       {record.isSuspicious ? (
                         <div className="flex items-center gap-2 text-red-600 font-semibold">
                           <AlertCircle className="w-5 h-5" />
-                          <span>Suspicious</span>
+                          <span>{t('suspicious')}</span>
                         </div>
                       ) : (
                         <div className="flex items-center gap-2 text-green-600 font-semibold">
                           <CheckCircle className="w-5 h-5" />
-                          <span>Verified</span>
+                          <span>{t('verified')}</span>
                         </div>
                       )}
                     </div>
@@ -245,19 +247,19 @@ export default function LoginHistory() {
 
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-3 text-sm">
                     <div>
-                      <p className="text-gray-600">IP Address</p>
+                      <p className="text-gray-600">{t('ip_address')}</p>
                       <p className="font-mono text-gray-900 mt-1">
                         {maskIP(record.ipAddress)}
                       </p>
                     </div>
                     <div>
-                      <p className="text-gray-600">Date & Time</p>
+                      <p className="text-gray-600">{t('date_time')}</p>
                       <p className="text-gray-900 mt-1">
                         {formatDate(record.timestamp)}
                       </p>
                     </div>
                     <div>
-                      <p className="text-gray-600">User Agent</p>
+                      <p className="text-gray-600">{t('user_agent')}</p>
                       <p className="text-gray-900 mt-1 truncate">
                         {record.deviceInfo?.userAgent || "Unknown"}
                       </p>
@@ -266,7 +268,7 @@ export default function LoginHistory() {
 
                   {record.isSuspicious && record.suspiciousReason && (
                     <div className="bg-red-50 border border-red-200 rounded p-3 text-sm text-red-700">
-                      <strong>Alert:</strong> {record.suspiciousReason}
+                      <strong>{t('alert')}</strong> {record.suspiciousReason}
                     </div>
                   )}
                 </div>
@@ -279,24 +281,24 @@ export default function LoginHistory() {
         <div className="mt-12 bg-blue-50 border border-blue-200 rounded-lg p-6">
           <h3 className="font-bold text-gray-900 mb-4 flex items-center gap-2">
             <CheckCircle className="w-5 h-5 text-blue-600" />
-            Security Tips
+            {t('security_tips')}
           </h3>
           <ul className="space-y-2 text-sm text-gray-700">
             <li className="flex items-start gap-3">
               <span className="text-blue-600 font-bold mt-0.5">•</span>
-              <span>Review unfamiliar devices and change your password if needed</span>
+              <span>{t('tip_review')}</span>
             </li>
             <li className="flex items-start gap-3">
               <span className="text-blue-600 font-bold mt-0.5">•</span>
-              <span>Enable two-factor authentication for additional security</span>
+              <span>{t('tip_2fa')}</span>
             </li>
             <li className="flex items-start gap-3">
               <span className="text-blue-600 font-bold mt-0.5">•</span>
-              <span>Log out from devices you don't recognize</span>
+              <span>{t('tip_logout')}</span>
             </li>
             <li className="flex items-start gap-3">
               <span className="text-blue-600 font-bold mt-0.5">•</span>
-              <span>Never share your password with anyone</span>
+              <span>{t('tip_never_share')}</span>
             </li>
           </ul>
         </div>

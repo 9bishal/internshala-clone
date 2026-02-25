@@ -4,6 +4,7 @@ const admin = require("firebase-admin");
 const Razorpay = require("razorpay");
 const crypto = require("crypto");
 const sgMail = require("@sendgrid/mail");
+const emailTemplates = require("../utils/emailTemplates");
 
 sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 
@@ -187,15 +188,15 @@ router.post("/create-order", async (req, res) => {
       return res.status(400).json({ message: "Invalid plan ID" });
     }
 
-    // Check payment time window (10 AM - 11 AM IST)
-    if (!isPaymentTimeAllowed()) {
-      return res.status(403).json({
-        message:
-          "Payments are only allowed between 10:00 AM and 11:00 AM IST. Please try again during this time window.",
-        paymentWindowStart: "10:00 AM IST",
-        paymentWindowEnd: "11:00 AM IST",
-      });
-    }
+    // TODO: Uncomment in production to enforce payment time window (10 AM - 11 AM IST)
+    // if (!isPaymentTimeAllowed()) {
+    //   return res.status(403).json({
+    //     message:
+    //       "Payments are only allowed between 10:00 AM and 11:00 AM IST. Please try again during this time window.",
+    //     paymentWindowStart: "10:00 AM IST",
+    //     paymentWindowEnd: "11:00 AM IST",
+    //   });
+    // }
 
     const plan = SUBSCRIPTION_PLANS[planId];
 
@@ -209,7 +210,7 @@ router.post("/create-order", async (req, res) => {
     const options = {
       amount: plan.price * 100, // Amount in paise
       currency: plan.currency,
-      receipt: `sub_${uid}_${Date.now()}`,
+      receipt: `sub_${uid.slice(-8)}_${Date.now().toString().slice(-8)}`,
       notes: {
         uid,
         planId,
@@ -241,6 +242,7 @@ router.post("/verify-payment", async (req, res) => {
       razorpay_order_id,
       razorpay_payment_id,
       razorpay_signature,
+      language = "en",
     } = req.body;
 
     if (
@@ -309,7 +311,8 @@ router.post("/verify-payment", async (req, res) => {
         userData.email,
         userData.name || "User",
         paymentRecord,
-        subscriptionData
+        subscriptionData,
+        language
       );
     } catch (emailError) {
       console.error("Error sending invoice email:", emailError);
@@ -330,54 +333,62 @@ router.post("/verify-payment", async (req, res) => {
 });
 
 // Send invoice email
-async function sendInvoiceEmail(email, name, payment, subscription) {
+async function sendInvoiceEmail(email, name, payment, subscription, language = "en") {
+  const templates = emailTemplates[language] || emailTemplates["en"];
+  const subject = templates.subscription_invoice_subject.replace("{planName}", payment.planName);
+
   const msg = {
     to: email,
     from: process.env.DEFAULT_FROM_EMAIL,
-    subject: `Payment Invoice - ${payment.planName}`,
+    subject: subject,
     html: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f4f4f4;">
         <div style="background-color: white; padding: 30px; border-radius: 8px;">
-          <h1 style="color: #007bff; text-align: center; margin-bottom: 30px;">Payment Successful!</h1>
+          <div style="text-align: center; margin-bottom: 20px;">
+            <div style="width: 60px; height: 60px; background: linear-gradient(135deg, #22c55e, #16a34a); border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; margin-bottom: 12px;">
+              <span style="color: white; font-size: 28px;">&#10003;</span>
+            </div>
+          </div>
+          <h1 style="color: #16a34a; text-align: center; margin-bottom: 8px;">${templates.subscription_invoice_title}</h1>
+          <p style="text-align: center; color: #6b7280; margin-bottom: 30px;">Thank you, ${name}! Your subscription is now active.</p>
           
-          <div style="background-color: #e8f4f8; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
-            <h2 style="color: #333; margin-top: 0;">Invoice Details</h2>
+          <div style="background-color: #f0fdf4; border: 1px solid #bbf7d0; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+            <h2 style="color: #15803d; margin-top: 0; margin-bottom: 16px;">${templates.subscription_invoice_subtitle}</h2>
             <table style="width: 100%; border-collapse: collapse;">
-              <tr>
-                <td style="padding: 10px 0; color: #666;">Transaction ID:</td>
-                <td style="padding: 10px 0; color: #333; font-weight: bold;">${payment.razorpay_payment_id}</td>
+              <tr style="border-bottom: 1px solid #d1fae5;">
+                <td style="padding: 10px 0; color: #6b7280; font-size: 14px;">${templates.payment_id}:</td>
+                <td style="padding: 10px 0; color: #111827; font-weight: 600; font-size: 14px; text-align: right;">${payment.razorpay_payment_id}</td>
+              </tr>
+              <tr style="border-bottom: 1px solid #d1fae5;">
+                <td style="padding: 10px 0; color: #6b7280; font-size: 14px;">${templates.order_id}:</td>
+                <td style="padding: 10px 0; color: #111827; font-weight: 600; font-size: 14px; text-align: right;">${payment.razorpay_order_id}</td>
+              </tr>
+              <tr style="border-bottom: 1px solid #d1fae5;">
+                <td style="padding: 10px 0; color: #6b7280; font-size: 14px;">Plan:</td>
+                <td style="padding: 10px 0; color: #111827; font-weight: 600; font-size: 14px; text-align: right;">${payment.planName}</td>
+              </tr>
+              <tr style="border-bottom: 1px solid #d1fae5;">
+                <td style="padding: 10px 0; color: #6b7280; font-size: 14px;">Validity:</td>
+                <td style="padding: 10px 0; color: #111827; font-weight: 600; font-size: 14px; text-align: right;">30 Days</td>
               </tr>
               <tr>
-                <td style="padding: 10px 0; color: #666;">Order ID:</td>
-                <td style="padding: 10px 0; color: #333; font-weight: bold;">${payment.razorpay_order_id}</td>
-              </tr>
-              <tr>
-                <td style="padding: 10px 0; color: #666;">Plan:</td>
-                <td style="padding: 10px 0; color: #333; font-weight: bold;">${payment.planName}</td>
-              </tr>
-              <tr>
-                <td style="padding: 10px 0; color: #666;">Amount Paid:</td>
-                <td style="padding: 10px 0; color: #007bff; font-weight: bold; font-size: 18px;">₹${payment.amount}</td>
-              </tr>
-              <tr>
-                <td style="padding: 10px 0; color: #666;">Date:</td>
-                <td style="padding: 10px 0; color: #333;">${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}</td>
+                <td style="padding: 10px 0; color: #6b7280; font-size: 14px;">${templates.amount_paid}:</td>
+                <td style="padding: 10px 0; color: #16a34a; font-weight: 700; font-size: 20px; text-align: right;">&#8377;${payment.amount}</td>
               </tr>
             </table>
           </div>
 
-          <div style="background-color: #f0f0f0; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
-            <h3 style="color: #333; margin-top: 0;">Subscription Details</h3>
-            <p style="color: #666; margin: 5px 0;">Status: <span style="color: #28a745; font-weight: bold;">Active</span></p>
-            <p style="color: #666; margin: 5px 0;">Valid Until: <strong>${subscription.expiresAt.toDate ? subscription.expiresAt.toDate().toLocaleDateString('en-IN') : new Date(subscription.expiresAt).toLocaleDateString('en-IN')}</strong></p>
-            <p style="color: #666; margin: 5px 0;">Internship Applications: <strong>${subscription.applicationsLimit === -1 ? 'Unlimited' : subscription.applicationsLimit} per month</strong></p>
+          <div style="background-color: #eff6ff; border: 1px solid #bfdbfe; padding: 16px; border-radius: 8px; margin-bottom: 20px;">
+            <p style="color: #1d4ed8; font-size: 14px; margin: 0;">
+              <strong>Transaction Date:</strong> ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', dateStyle: 'long', timeStyle: 'short' })} IST
+            </p>
           </div>
-
-          <p style="color: #666; text-align: center; margin: 20px 0;">Thank you for your purchase! If you have any questions, please contact our support team.</p>
           
           <div style="text-align: center; margin-top: 30px;">
-            <a href="${process.env.SITE_URL}/subscription" style="background-color: #007bff; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block;">View Subscription</a>
+            <a href="${process.env.SITE_URL}/subscription" style="background: linear-gradient(135deg, #3b82f6, #6366f1); color: white; padding: 14px 36px; text-decoration: none; border-radius: 8px; display: inline-block; font-weight: 600; font-size: 16px;">${templates.view_subscription}</a>
           </div>
+
+          <p style="text-align: center; color: #9ca3af; font-size: 12px; margin-top: 24px;">If you have any questions, please contact our support team.</p>
         </div>
       </div>
     `,
@@ -386,7 +397,109 @@ async function sendInvoiceEmail(email, name, payment, subscription) {
   await sgMail.send(msg);
 }
 
-// Check if user can apply to internship
+// Send payment failure email
+async function sendPaymentFailureEmail(email, name, planName, errorDescription, language = "en") {
+  const msg = {
+    to: email,
+    from: process.env.DEFAULT_FROM_EMAIL,
+    subject: `Payment Failed - ${planName} Subscription`,
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f4f4f4;">
+        <div style="background-color: white; padding: 30px; border-radius: 8px;">
+          <div style="text-align: center; margin-bottom: 20px;">
+            <div style="width: 60px; height: 60px; background: linear-gradient(135deg, #ef4444, #dc2626); border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; margin-bottom: 12px;">
+              <span style="color: white; font-size: 28px;">&#10007;</span>
+            </div>
+          </div>
+          <h1 style="color: #dc2626; text-align: center; margin-bottom: 8px;">Payment Failed</h1>
+          <p style="text-align: center; color: #6b7280; margin-bottom: 30px;">Hi ${name}, your payment for <strong>${planName}</strong> could not be processed.</p>
+          
+          <div style="background-color: #fef2f2; border: 1px solid #fecaca; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+            <h2 style="color: #991b1b; margin-top: 0;">What Happened?</h2>
+            <p style="color: #7f1d1d; margin-bottom: 0;">${errorDescription || "Your payment was declined or could not be completed. No amount has been charged to your account."}</p>
+          </div>
+
+          <div style="background-color: #f9fafb; border: 1px solid #e5e7eb; padding: 16px; border-radius: 8px; margin-bottom: 24px;">
+            <h3 style="color: #374151; margin-top: 0; font-size: 15px;">What to do next:</h3>
+            <ul style="color: #6b7280; font-size: 14px; padding-left: 20px; margin: 0;">
+              <li style="margin-bottom: 8px;">Verify your card details are correct</li>
+              <li style="margin-bottom: 8px;">Ensure sufficient balance in your account</li>
+              <li style="margin-bottom: 8px;">Try a different payment method</li>
+              <li>Contact your bank if the issue persists</li>
+            </ul>
+          </div>
+
+          <div style="text-align: center;">
+            <a href="${process.env.SITE_URL}/subscription" style="background: linear-gradient(135deg, #3b82f6, #6366f1); color: white; padding: 14px 36px; text-decoration: none; border-radius: 8px; display: inline-block; font-weight: 600; font-size: 16px;">Try Again</a>
+          </div>
+
+          <p style="text-align: center; color: #9ca3af; font-size: 12px; margin-top: 24px;">Need help? Contact us at support@internshala.com</p>
+        </div>
+      </div>
+    `,
+  };
+
+  await sgMail.send(msg);
+}
+
+// Record payment failure and send failure email
+router.post("/payment-failed", async (req, res) => {
+  try {
+    db = admin.firestore();
+    const { uid, planId, razorpay_order_id, error_code, error_description, language = "en" } = req.body;
+
+    if (!uid || !planId) {
+      return res.status(400).json({ message: "UID and plan ID are required" });
+    }
+
+    const plan = SUBSCRIPTION_PLANS[planId];
+    if (!plan) {
+      return res.status(400).json({ message: "Invalid plan ID" });
+    }
+
+    // Record failed payment in Firestore
+    const failedPaymentRecord = {
+      uid,
+      planId,
+      planName: plan.name,
+      amount: plan.price,
+      currency: plan.currency,
+      razorpay_order_id: razorpay_order_id || null,
+      error_code: error_code || "PAYMENT_FAILED",
+      error_description: error_description || "Payment was not completed",
+      status: "failed",
+      timestamp: new Date(),
+    };
+
+    await db.collection("payments").add(failedPaymentRecord);
+    console.log(`📧 Payment failure recorded for user ${uid}, plan: ${planId}`);
+
+    // Get user data for email
+    const userDoc = await db.collection("users").doc(uid).get();
+    const userData = userDoc.exists ? userDoc.data() : null;
+
+    if (userData?.email) {
+      try {
+        await sendPaymentFailureEmail(
+          userData.email,
+          userData.name || "User",
+          plan.name,
+          error_description,
+          language
+        );
+        console.log(`📧 Payment failure email sent to ${userData.email}`);
+      } catch (emailError) {
+        console.error("Error sending failure email:", emailError);
+      }
+    }
+
+    res.status(200).json({ message: "Payment failure recorded" });
+  } catch (error) {
+    console.error("Error recording payment failure:", error);
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+});
+
 router.post("/can-apply", async (req, res) => {
   try {
     db = admin.firestore();

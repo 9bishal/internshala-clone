@@ -14,6 +14,7 @@ const language = require("./language");
 const friends = require("./friends");
 const upload = require("./upload");
 const messages = require("./messages");
+const users = require("./users");
 
 router.use("/admin", admin);
 router.use("/internship", intern);
@@ -29,5 +30,6 @@ router.use("/language", language);
 router.use("/friends", friends);
 router.use("/upload", upload);
 router.use("/messages", messages);
+router.use("/users", users);
 
 module.exports = router;

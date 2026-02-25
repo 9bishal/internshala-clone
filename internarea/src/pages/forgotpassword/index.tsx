@@ -6,10 +6,14 @@ import axios from "axios";
 import { getApiEndpoint } from "@/utils/api";
 import { Mail, Lock, Eye, EyeOff, ArrowLeft, Loader } from "lucide-react";
 import { toast } from "react-toastify";
+import { useTranslation } from "@/utils/i18n";
+import { selectLanguage } from "@/Feature/Userslice";
 
 export default function ForgotPassword() {
   const router = useRouter();
   const user = useSelector(selectuser);
+  const language = useSelector(selectLanguage);
+  const { t } = useTranslation(language);
   const [step, setStep] = useState("email"); // email, otp, password
   const [email, setEmail] = useState("");
   const [otp, setOtp] = useState("");
@@ -38,7 +42,7 @@ export default function ForgotPassword() {
     try {
       const response = await axios.post(
         getApiEndpoint("/auth/forgot-password"),
-        { email }
+        { email, language }
       );
 
       toast.success(response.data.message);
@@ -114,19 +118,19 @@ export default function ForgotPassword() {
           className="flex items-center text-gray-600 hover:text-gray-900 mb-6 transition-colors"
         >
           <ArrowLeft className="w-5 h-5 mr-2" />
-          Back
+          {t('back')}
         </button>
 
         {/* Card */}
         <div className="bg-white rounded-2xl shadow-xl overflow-hidden">
           <div className="bg-gradient-to-r from-indigo-600 to-blue-600 px-8 py-10">
             <h1 className="text-2xl sm:text-3xl font-bold text-white">
-              {user ? "Change Password" : "Reset Password"}
+              {user ? t('change_password_page_title') : t('forgot_password')}
             </h1>
             <p className="text-indigo-100 mt-2 text-sm">
               {user 
-                ? `Logged in as ${user.email}` 
-                : "Secure password recovery"
+                ? `${t('logged_in_as')} ${user.email}` 
+                : t('signin_desc')
               }
             </p>
           </div>
@@ -140,7 +144,7 @@ export default function ForgotPassword() {
                 }`}>
                   {step !== "email" ? "✓" : "1"}
                 </div>
-                <span className="ml-2 text-xs text-gray-600 hidden sm:inline">Email</span>
+                <span className="ml-2 text-xs text-gray-600 hidden sm:inline">{t('step_1_email')}</span>
               </div>
               <div className={`flex-1 h-0.5 mx-2 ${step !== "email" ? "bg-green-500" : "bg-gray-200"}`} />
               <div className="flex items-center">
@@ -149,7 +153,7 @@ export default function ForgotPassword() {
                 }`}>
                   2
                 </div>
-                <span className="ml-2 text-xs text-gray-600 hidden sm:inline">Verify & Reset</span>
+                <span className="ml-2 text-xs text-gray-600 hidden sm:inline">{t('step_2_verify_reset')}</span>
               </div>
             </div>
           </div>
@@ -161,13 +165,13 @@ export default function ForgotPassword() {
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     <Mail className="w-4 h-4 inline mr-2" />
-                    Email Address
+                    {t('email_address')}
                   </label>
                   <input
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    placeholder="Enter your registered email"
+                    placeholder={t('enter_registered_email_placeholder')}
                     className={`w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all text-gray-900 ${
                       user?.email ? "bg-gray-50" : ""
                     }`}
@@ -176,7 +180,7 @@ export default function ForgotPassword() {
                   />
                   {user?.email && (
                     <p className="text-xs text-green-600 mt-1">
-                      ✓ Auto-filled from your logged-in account
+                      ✓ {t('autofilled_from_account')}
                     </p>
                   )}
                 </div>
@@ -189,12 +193,12 @@ export default function ForgotPassword() {
                   {loading ? (
                     <>
                       <Loader className="w-4 h-4 animate-spin" />
-                      Sending OTP...
+                      {t('sending_otp')}
                     </>
                   ) : otpSent ? (
-                    "OTP Already Sent"
+                    t('requested')
                   ) : (
-                    "Send OTP"
+                    t('send_otp')
                   )}
                 </button>
               </div>
@@ -240,7 +244,7 @@ export default function ForgotPassword() {
                       type={showPassword ? "text" : "password"}
                       value={newPassword}
                       onChange={(e) => setNewPassword(e.target.value)}
-                      placeholder="Enter new password (min 6 chars)"
+                      placeholder={t('enter_new_password_placeholder')}
                       className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all pr-10 text-gray-900"
                       required
                     />
@@ -260,7 +264,7 @@ export default function ForgotPassword() {
                   {newPassword && (
                     <div className="mt-2 space-y-1">
                       <div className={`text-xs flex items-center gap-1 ${newPassword.length >= 6 ? "text-green-600" : "text-gray-400"}`}>
-                        {newPassword.length >= 6 ? "✓" : "○"} At least 6 characters
+                        {newPassword.length >= 6 ? "✓" : "○"} {t('min_6_chars')}
                       </div>
                     </div>
                   )}
@@ -274,15 +278,15 @@ export default function ForgotPassword() {
                     type={showPassword ? "text" : "password"}
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
-                    placeholder="Confirm password"
+                    placeholder={t('confirm_password_placeholder')}
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all text-gray-900"
                     required
                   />
                   {confirmPassword && newPassword !== confirmPassword && (
-                    <p className="text-xs text-red-500 mt-1">Passwords do not match</p>
+                    <p className="text-xs text-red-500 mt-1">{t('passwords_dont_match')}</p>
                   )}
                   {confirmPassword && newPassword === confirmPassword && confirmPassword.length >= 6 && (
-                    <p className="text-xs text-green-600 mt-1">✓ Passwords match</p>
+                    <p className="text-xs text-green-600 mt-1">✓ {t('passwords_match')}</p>
                   )}
                 </div>
 
@@ -294,10 +298,10 @@ export default function ForgotPassword() {
                   {loading ? (
                     <>
                       <Loader className="w-4 h-4 animate-spin" />
-                      Resetting...
+                      {t('resetting')}
                     </>
                   ) : (
-                    "Reset Password"
+                    t('reset_password')
                   )}
                 </button>
 
@@ -312,7 +316,7 @@ export default function ForgotPassword() {
                   }}
                   className="w-full text-indigo-600 hover:text-indigo-700 font-medium py-2 text-sm"
                 >
-                  ← Try different email
+                  ← {t('try_different_email')}
                 </button>
               </div>
             )}
@@ -322,12 +326,12 @@ export default function ForgotPassword() {
         {/* Help Text */}
         <div className="text-center mt-6 text-sm text-gray-600">
           <p>
-            Remember your password?{" "}
+            {t('remember_password')}{" "}
             <button
               onClick={() => router.push("/")}
               className="text-indigo-600 hover:text-indigo-700 font-medium"
             >
-              Go to Login
+              {t('go_to_login')}
             </button>
           </p>
         </div>

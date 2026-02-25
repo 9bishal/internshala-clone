@@ -8,7 +8,31 @@ import {
   Settings
 } from 'lucide-react';
 import Link from 'next/link';
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/router';
+import { LogOut } from 'lucide-react';
+import { toast } from 'react-toastify';
 const index = () => {
+    const router = useRouter();
+    const [isAuthorized, setIsAuthorized] = useState(false);
+
+    useEffect(() => {
+        const token = localStorage.getItem("adminToken");
+        if (!token) {
+            router.push("/adminlogin");
+        } else {
+            setIsAuthorized(true);
+        }
+    }, [router]);
+
+    const handleLogout = () => {
+        localStorage.removeItem("adminToken");
+        toast.success("Logged out from Admin Panel");
+        router.push("/adminlogin");
+    };
+
+    if (!isAuthorized) return null;
+
     const stats = [
         { label: 'Total Applications', value: '2,345', change: '+12%', changeType: 'positive' },
         { label: 'Active Jobs', value: '45', change: '+3%', changeType: 'positive' },
@@ -64,11 +88,20 @@ const index = () => {
     <div className="min-h-screen bg-gray-50 py-8">
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold text-gray-900">Admin Dashboard</h1>
-        <p className="mt-1 text-sm text-gray-500">
-          Manage your jobs, internships, and applications
-        </p>
+      <div className="mb-8 flex justify-between items-start">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Admin Dashboard</h1>
+          <p className="mt-1 text-sm text-gray-500">
+            Manage your jobs, internships, and applications
+          </p>
+        </div>
+        <button 
+          onClick={handleLogout}
+          className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition"
+        >
+          <LogOut size={18} />
+          Logout
+        </button>
       </div>
 
       {/* Stats */}

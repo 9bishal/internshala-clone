@@ -17,6 +17,8 @@ import {
   AlertCircle,
 } from "lucide-react";
 import { toast } from "react-toastify";
+import { useTranslation } from "@/utils/i18n";
+import { selectLanguage } from "@/Feature/Userslice";
 
 interface Resume {
   id: string;
@@ -34,6 +36,8 @@ interface Resume {
 export default function ResumeBuilder() {
   const router = useRouter();
   const user = useSelector(selectuser);
+  const language = useSelector(selectLanguage);
+  const { t } = useTranslation(language);
   const [resumes, setResumes] = useState<Resume[]>([]);
   const [loading, setLoading] = useState(true);
   const [userSubscription, setUserSubscription] = useState<any>(null);
@@ -84,7 +88,7 @@ export default function ResumeBuilder() {
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <Loader className="w-12 h-12 animate-spin text-blue-600 mx-auto mb-4" />
-          <p className="text-gray-600">Loading...</p>
+          <p className="text-gray-600">{t('loading')}</p>
         </div>
       </div>
     );
@@ -103,13 +107,13 @@ export default function ResumeBuilder() {
               className="flex items-center text-gray-600 hover:text-gray-900 mb-4"
             >
               <ArrowLeft className="w-5 h-5 mr-2" />
-              Back to Profile
+              {t('back_to_profile')}
             </button>
             <h1 className="text-3xl font-bold text-gray-900">
-              Resume Builder
+              {t('resume_builder_title')}
             </h1>
             <p className="text-gray-600 mt-2">
-              Create professional resumes with our easy-to-use builder
+              {t('resume_builder_desc')}
             </p>
           </div>
 
@@ -125,7 +129,7 @@ export default function ResumeBuilder() {
             {hasPremium ? (
               <>
                 <Plus className="w-5 h-5 mr-2" />
-                Create New Resume (₹50)
+                {t('create_new_resume')}
               </>
             ) : (
               <>
@@ -185,24 +189,23 @@ export default function ResumeBuilder() {
               <AlertCircle className="w-6 h-6 text-blue-600 mr-4 flex-shrink-0 mt-1" />
               <div>
                 <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                  Resume Creation Pricing
+                  {t('resume_pricing_title')}
                 </h3>
                 <p className="text-gray-700 mb-3">
-                  Each resume creation costs <strong>₹50</strong> (one-time payment per resume).
-                  This is in addition to your premium subscription.
+                  {t('resume_pricing_desc')}
                 </p>
                 <div className="space-y-2">
                   <div className="flex items-center text-sm text-gray-600">
                     <CheckCircle className="w-4 h-4 text-green-600 mr-2" />
-                    Email verification required (OTP)
+                    {t('email_verification_otp')}
                   </div>
                   <div className="flex items-center text-sm text-gray-600">
                     <CheckCircle className="w-4 h-4 text-green-600 mr-2" />
-                    Secure payment via Razorpay
+                    {t('secure_payment_razorpay')}
                   </div>
                   <div className="flex items-center text-sm text-gray-600">
                     <CheckCircle className="w-4 h-4 text-green-600 mr-2" />
-                    Instant email receipt
+                    {t('instant_receipt')}
                   </div>
                 </div>
               </div>
@@ -215,17 +218,17 @@ export default function ResumeBuilder() {
           <div className="bg-white rounded-lg shadow-md p-12 text-center">
             <FileText className="w-16 h-16 text-gray-400 mx-auto mb-4" />
             <h2 className="text-2xl font-semibold text-gray-900 mb-2">
-              No Resumes Yet
+              {t('no_resumes_yet')}
             </h2>
             <p className="text-gray-600 mb-6">
-              Create your first professional resume today!
+              {t('create_first_resume_desc') || "Create your first professional resume today!"}
             </p>
             <button
               onClick={handleCreateResume}
               className="bg-blue-600 text-white px-8 py-3 rounded-lg hover:bg-blue-700 transition inline-flex items-center"
             >
               <Plus className="w-5 h-5 mr-2" />
-              Create Your First Resume (₹50)
+              {t('create_first_resume')}
             </button>
           </div>
         )}
@@ -284,17 +287,17 @@ export default function ResumeBuilder() {
         {/* Subscription Info */}
         <div className="mt-12 bg-white rounded-lg shadow-md p-6">
           <h2 className="text-xl font-semibold text-gray-900 mb-4">
-            Your Subscription
+            {t('your_subscription')}
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="border border-gray-200 rounded-lg p-4">
-              <p className="text-sm text-gray-600 mb-1">Current Plan</p>
+              <p className="text-sm text-gray-600 mb-1">{t('current_plan')}</p>
               <p className="text-lg font-semibold text-gray-900 capitalize">
                 {userSubscription?.planId || "Free"}
               </p>
             </div>
             <div className="border border-gray-200 rounded-lg p-4">
-              <p className="text-sm text-gray-600 mb-1">Status</p>
+              <p className="text-sm text-gray-600 mb-1">{t('status_label')}</p>
               <p className={`text-lg font-semibold ${
                 userSubscription?.status === "active" ? "text-green-600" : "text-red-600"
               }`}>
@@ -302,11 +305,11 @@ export default function ResumeBuilder() {
               </p>
             </div>
             <div className="border border-gray-200 rounded-lg p-4">
-              <p className="text-sm text-gray-600 mb-1">Expires On</p>
+              <p className="text-sm text-gray-600 mb-1">{t('expires_on')}</p>
               <p className="text-lg font-semibold text-gray-900">
                 {userSubscription?.endsAt
                   ? new Date(userSubscription.endsAt.seconds * 1000).toLocaleDateString()
-                  : "N/A"}
+                  : t('not_available')}
               </p>
             </div>
           </div>

@@ -68,19 +68,7 @@ router.post("/request-otp", async (req, res) => {
 
     const userData = userDoc.data();
 
-    // Check if user has premium subscription
-    const subscription = userData.subscription || {};
-    const hasPremium = ["bronze", "silver", "gold"].includes(
-      subscription.planId
-    );
-
-    if (!hasPremium) {
-      return res.status(403).json({
-        message:
-          "Resume creation is only available for premium plan subscribers (Bronze, Silver, or Gold).",
-        requiresPremium: true,
-      });
-    }
+    // Anyone can request OTP to pay ₹50
 
     // Generate OTP
     const otp = generateOTP();
@@ -179,7 +167,7 @@ router.post("/create-resume-order", async (req, res) => {
     const options = {
       amount: RESUME_PRICE * 100, // Amount in paise
       currency: "INR",
-      receipt: `resume_${uid}_${Date.now()}`,
+      receipt: `res_${uid.slice(-8)}_${Date.now().toString().slice(-8)}`,
       notes: {
         uid,
         type: "resume_creation",
@@ -249,6 +237,10 @@ router.post("/verify-resume-payment", async (req, res) => {
 
     await db.collection("payments").add(paymentRecord);
 
+    await db.collection("users").doc(uid).update({
+      hasPaidForResume: true,
+    });
+
     // Clean up OTP
     await db.collection("resume_otps").doc(uid).delete();
 
@@ -282,7 +274,20 @@ router.post("/save-resume", async (req, res) => {
 
     const resumeRef = await db.collection("resumes").add(resume);
 
-    // Attach to user profile
+    const userDoc = await db.collection("users").doc(uid).get();
+    const userData = userDoc.data() || {};
+    
+    const subscription = userData.subscription || {};
+    const hasPremium = ["bronze", "silver", "gold"].includes(subscription?.planId);
+
+    if (!hasPremium && userData.hasPaidForResume) {
+      // Consume the ₹50 single-use payment
+      await db.collection("users").doc(uid).update({
+        hasPaidForResume: admin.firestore.FieldValue.delete()
+      });
+    }
+
+    // Ensure it becomes default automatically
     await db
       .collection("users")
       .doc(uid)
@@ -424,10 +429,12 @@ router.get("/access/:uid", async (req, res) => {
     const userData = userDoc.data();
     const subscription = userData.subscription || {};
     
-    // Check if user has premium subscription
+    // Check if user has premium subscription or has paid for resume explicitly
     const hasPremium = ["bronze", "silver", "gold"].includes(
-      subscription.planId
+      subscription?.planId
     );
+    const hasPaidForResume = userData.hasPaidForResume === true;
+    const canCreateResume = hasPremium || hasPaidForResume;
 
     // Count user's resumes
     const resumesSnapshot = await db
@@ -438,11 +445,12 @@ router.get("/access/:uid", async (req, res) => {
     const resumesCreated = resumesSnapshot.size;
 
     res.status(200).json({
-      planId: subscription.planId || "free",
-      accessLevel: hasPremium ? 1 : 0,
-      maxResumes: hasPremium ? -1 : 0, // -1 = unlimited for premium
+      planId: subscription?.planId || "free",
+      accessLevel: canCreateResume ? 1 : 0,
+      maxResumes: canCreateResume ? -1 : 0, // -1 = unlimited
       resumesCreated,
-      canCreateResume: hasPremium,
+      canCreateResume,
+      hasPaidForResume,
       planDetails: subscription,
     });
   } catch (error) {
@@ -505,6 +513,59 @@ router.get("/:uid", async (req, res) => {
     });
   } catch (error) {
     console.error("Error fetching resume:", error);
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+});
+
+// Delete a resume
+router.delete("/delete-resume/:uid/:resumeId", async (req, res) => {
+  try {
+    db = admin.firestore();
+    const { uid, resumeId } = req.params;
+
+    const resumeDoc = await db.collection("resumes").doc(resumeId).get();
+    if (!resumeDoc.exists || resumeDoc.data().uid !== uid) {
+      return res.status(404).json({ message: "Resume not found or unauthorized" });
+    }
+
+    await db.collection("resumes").doc(resumeId).delete();
+
+    // Check if it was the default resume
+    const userDoc = await db.collection("users").doc(uid).get();
+    if (userDoc.exists && userDoc.data().resumeId === resumeId) {
+      await db.collection("users").doc(uid).update({
+        resumeId: admin.firestore.FieldValue.delete(),
+        hasResume: false
+      });
+    }
+
+    res.status(200).json({ message: "Resume deleted successfully" });
+  } catch (error) {
+    console.error("Error deleting resume:", error);
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+});
+
+// Set a resume as default
+router.post("/set-default-resume", async (req, res) => {
+  try {
+    db = admin.firestore();
+    const { uid, resumeId } = req.body;
+
+    const resumeDoc = await db.collection("resumes").doc(resumeId).get();
+    if (!resumeDoc.exists || resumeDoc.data().uid !== uid) {
+      return res.status(404).json({ message: "Resume not found or unauthorized" });
+    }
+
+    await db.collection("users").doc(uid).update({
+      resumeId,
+      hasResume: true,
+      resumeUpdatedAt: new Date()
+    });
+
+    res.status(200).json({ message: "Default resume updated successfully" });
+  } catch (error) {
+    console.error("Error setting default resume:", error);
     res.status(500).json({ message: "Server error", error: error.message });
   }
 });

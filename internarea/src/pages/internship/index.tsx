@@ -9,12 +9,14 @@ import {
   PlayCircle,
   Pointer,
   X,
+  CheckCircle2,
 } from "lucide-react";
 import Link from "next/link";
 import React, { useEffect, useState } from "react";
 import { getApiEndpoint } from "@/utils/api";
 import { useSelector } from "react-redux";
-import { selectuser } from "@/Feature/Userslice";
+import { selectuser, selectLanguage } from "@/Feature/Userslice";
+import { useTranslation } from "@/utils/i18n";
 // const internshipData = [
 //   {
 //     _id: "1",
@@ -50,6 +52,8 @@ import { selectuser } from "@/Feature/Userslice";
 
 const index = () => {
   const user = useSelector(selectuser);
+  const language = useSelector(selectLanguage);
+  const { t } = useTranslation(language);
   const [filteredInternships, setfilteredInternships] = useState<any>([]);
   const [isFiltervisible, setisFiltervisible] = useState(false);
   const [filter, setfilters] = useState({
@@ -62,6 +66,7 @@ const index = () => {
   const [internshipData, setinternship] = useState<any>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [appliedIds, setAppliedIds] = useState<string[]>([]);
 
   // Fetch internships with retry logic
   const fetchInternshipsWithRetry = async (retries = 3) => {
@@ -111,13 +116,19 @@ const index = () => {
       setError(`Failed to load internships: ${lastError.message || 'Unknown error'}`);
     }
   };
-
   useEffect(() => {
     const loadInternships = async () => {
       setLoading(true);
       setError(null);
       try {
         await fetchInternshipsWithRetry();
+        if (user?.uid) {
+          const appRes = await axios.get(getApiEndpoint("/application"));
+          const uApps = appRes.data.filter((app: any) => 
+            app.user?.uid === user.uid || app.user?.name === user.name || app.user?.email === user.email
+          );
+          setAppliedIds(uApps.map((app: any) => app.Application));
+        }
       } catch (err) {
         console.error("Error in useEffect:", err);
         setError("An unexpected error occurred while loading internships");
@@ -127,7 +138,8 @@ const index = () => {
     };
     
     loadInternships();
-  }, []);
+  }, [user]);
+
   useEffect(() => {
     const filtered = internshipData.filter((internship:any) => {
       // Don't show internships posted by the current user
@@ -170,20 +182,20 @@ const index = () => {
             <div className="flex items-center justify-between mb-6">
               <div className="flex items-center space-x-2">
                 <Filter className="h-5 w-5 text-blue-600" />
-                <span className="font-medium text-black">Filters</span>
+                <span className="font-medium text-black">{t('filters')}</span>
               </div>
               <button
                 onClick={clearFilters}
                 className="text-sm text-blue-600 hover:text-blue-700"
               >
-                Clear all
+                {t('clear_all')}
               </button>
             </div>
             <div className="space-y-6">
               {/* Profile/Category Filter */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Category
+                  {t('category')}
                 </label>
                 <input
                   type="text"
@@ -191,13 +203,13 @@ const index = () => {
                   value={filter.category}
                   onChange={handlefilterchange}
                   className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 text-gray-700"
-                  placeholder="e.g. Marketing Intern"
+                  placeholder={t('category_placeholder')}
                 />
               </div>
               {/* Location Filter */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Location
+                  {t('location')}
                 </label>
                 <input
                   type="text"
@@ -205,7 +217,7 @@ const index = () => {
                   value={filter.location}
                   onChange={handlefilterchange}
                   className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 text-gray-700"
-                  placeholder="e.g. Mumbai"
+                  placeholder={t('location_placeholder')}
                 />
               </div>
 
@@ -219,7 +231,7 @@ const index = () => {
                     onChange={handlefilterchange}
                     className="h-4 w-4 text-blue-600 rounded "
                   />
-                  <span className="text-gray-700">Work from home</span>
+                  <span className="text-gray-700">{t('work_from_home')}</span>
                 </label>
                 <label className="flex items-center space-x-2">
                   <input
@@ -229,14 +241,14 @@ const index = () => {
                     onChange={handlefilterchange}
                     className="h-4 w-4 text-blue-600 rounded"
                   />
-                  <span className="text-gray-700">Part-time</span>
+                  <span className="text-gray-700">{t('part_time')}</span>
                 </label>
               </div>
 
               {/* Stipend Range */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Monthly Stipend (₹)
+                  {t('monthly_stipend')}
                 </label>
                 <input
                   type="range"
@@ -262,12 +274,12 @@ const index = () => {
                 className="w-full flex items-center justify-center space-x-2 bg-white p-3 rounded-lg shadow-sm text-black"
               >
                 <Filter className="h-5 w-5" />
-                <span> Show Filters</span>
+                <span> {t('show_filters')}</span>
               </button>
             </div>
             <div className="bg-white p-4 rounded-lg shadow-sm mb-4">
               <p className="text-center font-medium text-black">
-                {filteredInternships.length} Internships found
+                {t('internships_found').replace('{count}', filteredInternships.length.toString())}
               </p>
             </div>
             {loading ? (
@@ -277,12 +289,12 @@ const index = () => {
                     <PlayCircle className="h-8 w-8" />
                   </div>
                 </div>
-                <p className="text-gray-600">Loading internships...</p>
+                <p className="text-gray-600">{t('loading_internships')}</p>
               </div>
             ) : error ? (
               <div className="bg-red-50 border border-red-200 rounded-lg p-8 text-center">
                 <div className="mb-4 text-4xl">⚠️</div>
-                <p className="text-red-800 font-semibold mb-2">Error Loading Internships</p>
+                <p className="text-red-800 font-semibold mb-2">{t('error_loading_internships')}</p>
                 <p className="text-red-600 mb-4">{error}</p>
                 <button
                   onClick={() => {
@@ -292,12 +304,12 @@ const index = () => {
                   }}
                   className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
                 >
-                  Try Again
+                  {t('try_again')}
                 </button>
               </div>
             ) : filteredInternships.length === 0 ? (
               <div className="bg-white p-8 rounded-lg shadow-sm text-center">
-                <p className="text-gray-600">No internships found matching your filters</p>
+                <p className="text-gray-600">{t('no_internships_found')}</p>
               </div>
             ) : null}
             {!loading && !error && filteredInternships.length > 0 && (
@@ -309,7 +321,7 @@ const index = () => {
                 >
                   <div className="flex items-center space-x-2 text-blue-600 mb-4">
                     <ArrowUpRight className="h-5 w-5" />
-                    <span className="font-medium">Actively Hiring</span>
+                    <span className="font-medium">{t('actively_hiring')}</span>
                   </div>
                   <h2 className="text-xl font-bold text-gray-900 mb-2">
                     {internship.title}
@@ -320,21 +332,21 @@ const index = () => {
                     <div className="flex items-center space-x-2 text-gray-600">
                       <PlayCircle className="h-5 w-5" />
                       <div>
-                        <p className="text-sm font-medium">Start Date</p>
+                        <p className="text-sm font-medium">{t('start_date')}</p>
                         <p className="text-sm">{internship.startDate}</p>
                       </div>
                     </div>
                     <div className="flex items-center space-x-2 text-gray-600">
                       <Pin className="h-5 w-5" />
                       <div>
-                        <p className="text-sm font-medium">Location</p>
+                        <p className="text-sm font-medium">{t('location')}</p>
                         <p className="text-sm">{internship.location}</p>
                       </div>
                     </div>
                     <div className="flex items-center space-x-2 text-gray-600">
                       <DollarSign className="h-5 w-5" />
                       <div>
-                        <p className="text-sm font-medium">Stipend</p>
+                        <p className="text-sm font-medium">{t('stipend')}</p>
                         <p className="text-sm">{internship.stipend}</p>
                       </div>
                     </div>
@@ -342,19 +354,26 @@ const index = () => {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-2">
                       <span className="px-3 py-1 bg-gray-100 text-gray-600 rounded-full text-sm">
-                        Internship
+                        {t('internship_tag')}
                       </span>
                       <div className="flex items-center space-x-1 text-green-600">
                         <Clock className="h-4 w-4" />
-                        <span className="text-sm">Posted recently</span>
+                        <span className="text-sm">{t('posted_recently')}</span>
                       </div>
                     </div>
-                    <Link
-                      href={`/detailiternship/${internship._id}`}
-                      className="text-blue-600 hover:text-blue-700 font-medium"
-                    >
-                      View Details
-                    </Link>
+                    <div className="flex items-center gap-3">
+                      {appliedIds.includes(internship._id) ? (
+                        <span className="text-green-600 font-semibold text-sm flex items-center gap-1">
+                          <CheckCircle2 size={16} /> {t('applied')}
+                        </span>
+                      ) : null}
+                      <Link
+                        href={`/detailiternship/${internship._id}`}
+                        className="text-blue-600 hover:text-blue-700 font-medium"
+                      >
+                        {t('view_details')}
+                      </Link>
+                    </div>
                   </div>
                 </div>
               ))}
@@ -368,7 +387,7 @@ const index = () => {
         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 md:hidden">
           <div className="bg-white h-full w-full max-w-sm ml-auto p-6 overflow-y-auto">
             <div className="flex justify-between items-center mb-6">
-              <h2 className="text-lg font-bold">Filters</h2>
+              <h2 className="text-lg font-bold">{t('filters')}</h2>
               <button
                 onClick={() => setisFiltervisible(false)}
                 className="text-gray-400 hover:text-gray-600"
@@ -380,7 +399,7 @@ const index = () => {
               {/* Profile/Category Filter */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Category
+                  {t('category')}
                 </label>
                 <input
                   type="text"
@@ -388,13 +407,13 @@ const index = () => {
                   value={filter.category}
                   onChange={handlefilterchange}
                   className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 text-gray-700"
-                  placeholder="e.g. Marketing Intern"
+                  placeholder={t('category_placeholder')}
                 />
               </div>
               {/* Location Filter */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Location
+                  {t('location')}
                 </label>
                 <input
                   type="text"
@@ -402,7 +421,7 @@ const index = () => {
                   value={filter.location}
                   onChange={handlefilterchange}
                   className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 text-gray-700"
-                  placeholder="e.g. Mumbai"
+                  placeholder={t('location_placeholder')}
                 />
               </div>
 
@@ -416,7 +435,7 @@ const index = () => {
                     onChange={handlefilterchange}
                     className="h-4 w-4 text-blue-600 rounded "
                   />
-                  <span className="text-gray-700">Work from home</span>
+                  <span className="text-gray-700">{t('work_from_home')}</span>
                 </label>
                 <label className="flex items-center space-x-2">
                   <input
@@ -426,14 +445,14 @@ const index = () => {
                     onChange={handlefilterchange}
                     className="h-4 w-4 text-blue-600 rounded"
                   />
-                  <span className="text-gray-700">Part-time</span>
+                  <span className="text-gray-700">{t('part_time')}</span>
                 </label>
               </div>
 
               {/* Stipend Range */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Monthly Stipend (₹)
+                  {t('monthly_stipend')}
                 </label>
                 <input
                   type="range"

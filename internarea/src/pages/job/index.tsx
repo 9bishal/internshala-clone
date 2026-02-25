@@ -8,6 +8,7 @@ import {
   Pin,
   PlayCircle,
   X,
+  CheckCircle2,
 } from "lucide-react";
 import Link from "next/link";
 import React, { useEffect, useState } from "react";
@@ -130,6 +131,7 @@ const index = () => {
   const [filteredJobs, setjob] = useState<any>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [appliedIds, setAppliedIds] = useState<string[]>([]);
 
   // Fetch jobs with retry logic
   const fetchJobsWithRetry = async (retries = 3) => {
@@ -179,13 +181,19 @@ const index = () => {
       setError(`Failed to load jobs: ${lastError.message || 'Unknown error'}`);
     }
   };
-
   useEffect(() => {
     const loadJobs = async () => {
       setLoading(true);
       setError(null);
       try {
         await fetchJobsWithRetry();
+        if (user?.uid) {
+          const appRes = await axios.get(getApiEndpoint("/application"));
+          const uApps = appRes.data.filter((app: any) => 
+            app.user?.uid === user.uid || app.user?.name === user.name || app.user?.email === user.email
+          );
+          setAppliedIds(uApps.map((app: any) => app.Application));
+        }
       } catch (err) {
         console.error("Error in useEffect:", err);
         setError("An unexpected error occurred while loading jobs");
@@ -195,7 +203,8 @@ const index = () => {
     };
     
     loadJobs();
-  }, []);
+  }, [user]);
+
   useEffect(() => {
     const filtered = filteredJobs.filter((job:any) => {
       // Don't show jobs posted by the current user
@@ -431,12 +440,19 @@ const index = () => {
                         <span className="text-sm">Posted recently</span>
                       </div>
                     </div>
-                    <Link
-                      href={`/detailjob/${job._id}`}
-                      className="text-blue-600 hover:text-blue-700 font-medium"
-                    >
-                      View Details
-                    </Link>
+                    <div className="flex items-center gap-3">
+                      {appliedIds.includes(job._id) ? (
+                        <span className="text-green-600 font-semibold text-sm flex items-center gap-1">
+                          <CheckCircle2 size={16} /> Applied
+                        </span>
+                      ) : null}
+                      <Link
+                        href={`/detailjob/${job._id}`}
+                        className="text-blue-600 hover:text-blue-700 font-medium"
+                      >
+                        View Details
+                      </Link>
+                    </div>
                   </div>
                 </div>
               ))}

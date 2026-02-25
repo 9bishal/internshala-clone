@@ -4,6 +4,7 @@ const admin = require("firebase-admin");
 const Razorpay = require("razorpay");
 const crypto = require("crypto");
 const sgMail = require("@sendgrid/mail");
+const emailTemplates = require("../utils/emailTemplates");
 
 // Log configuration on module load
 console.log('🚀 [Resume-Razorpay] Module loaded');
@@ -31,45 +32,27 @@ function generateOTP() {
 }
 
 // Send OTP email
-async function sendOTPEmail(email, otp, name) {
-  console.log(`📧 [OTP Email] Preparing to send OTP to: ${email}`);
-  console.log(`📧 [OTP Email] Recipient name: ${name}`);
-  console.log(`📧 [OTP Email] OTP: ${otp}`);
-  console.log(`📧 [OTP Email] From email: ${process.env.DEFAULT_FROM_EMAIL}`);
-  console.log(`📧 [OTP Email] SendGrid API key configured: ${process.env.SENDGRID_API_KEY ? 'Yes' : 'No'}`);
-
-  if (!process.env.SENDGRID_API_KEY) {
-    console.error('❌ [OTP Email] SendGrid API key not configured!');
-    throw new Error('SendGrid API key not configured');
-  }
-
-  if (!process.env.DEFAULT_FROM_EMAIL) {
-    console.error('❌ [OTP Email] DEFAULT_FROM_EMAIL not configured!');
-    throw new Error('DEFAULT_FROM_EMAIL not configured');
-  }
-
-  if (!email) {
-    console.error('❌ [OTP Email] Recipient email is empty!');
-    throw new Error('Recipient email is required');
-  }
+async function sendOTPEmail(email, otp, name, language = "en") {
+  console.log(`📧 [OTP Email] Preparing to send OTP to: ${email} (Language: ${language})`);
+  const templates = emailTemplates[language] || emailTemplates["en"];
 
   const msg = {
     to: email,
     from: process.env.DEFAULT_FROM_EMAIL,
-    subject: "Resume Creation OTP - Internshala",
+    subject: templates.otp_subject,
     html: `
       <div style="font-family: Arial, sans-serif; background-color: #f4f4f4; padding: 20px;">
         <div style="background-color: white; padding: 30px; border-radius: 8px; max-width: 500px; margin: 0 auto;">
-          <h2 style="color: #333; margin-bottom: 20px;">Resume Creation Verification</h2>
+          <h2 style="color: #333; margin-bottom: 20px;">${templates.resume_otp_title}</h2>
           <p style="color: #666; font-size: 16px; margin-bottom: 20px;">
             Hi ${name},<br><br>
-            To proceed with resume creation (₹50), please verify your email with the OTP below:
+            ${templates.resume_otp_body}
           </p>
           <div style="background-color: #f0f0f0; padding: 15px; border-radius: 4px; text-align: center; margin: 20px 0;">
             <h1 style="color: #007bff; letter-spacing: 2px; margin: 0;">${otp}</h1>
           </div>
           <p style="color: #999; font-size: 14px;">
-            This OTP will expire in 10 minutes. If you didn't request this, please ignore this email.
+            ${templates.otp_expiry_msg}
           </p>
         </div>
       </div>
@@ -97,7 +80,7 @@ router.post("/request-otp", async (req, res) => {
   try {
     console.log('🔐 [Request OTP] Starting OTP request process...');
     db = admin.firestore();
-    const { uid } = req.body;
+    const { uid, language = "en" } = req.body;
 
     console.log(`🔐 [Request OTP] UID: ${uid}`);
 
@@ -127,22 +110,7 @@ router.post("/request-otp", async (req, res) => {
       });
     }
 
-    // Check if user has premium subscription
-    const subscription = userData.subscription || {};
-    const hasPremium = ["bronze", "silver", "gold"].includes(
-      subscription.planId
-    );
-
-    console.log(`🔒 [Request OTP] Has premium: ${hasPremium}`);
-
-    if (!hasPremium) {
-      console.warn(`⚠️ [Request OTP] User ${uid} does not have premium subscription`);
-      return res.status(403).json({
-        message:
-          "Resume creation is only available for premium plan subscribers (Bronze, Silver, or Gold).",
-        requiresPremium: true,
-      });
-    }
+    // Removed: Premium only check. Anyone can pay the 50rs. and create a resume!
 
     // Generate OTP
     const otp = generateOTP();
@@ -166,8 +134,8 @@ router.post("/request-otp", async (req, res) => {
     console.log(`✅ [Request OTP] OTP stored in database`);
 
     // Send OTP email
-    console.log(`📧 [Request OTP] Attempting to send OTP email...`);
-    await sendOTPEmail(userData.email, otp, userData.name || "User");
+    console.log(`📧 [Request OTP] Attempting to send OTP email in ${language}...`);
+    await sendOTPEmail(userData.email, otp, userData.name || "User", language);
 
     console.log(`✅ [Request OTP] OTP process completed successfully`);
     res.status(200).json({
@@ -283,7 +251,7 @@ router.post("/create-resume-order", async (req, res) => {
     const options = {
       amount: RESUME_PRICE * 100, // Amount in paise
       currency: "INR",
-      receipt: `resume_${uid}_${Date.now()}`,
+      receipt: `res_${uid.slice(-8)}_${Date.now().toString().slice(-8)}`,
       notes: {
         uid,
         type: "resume_creation",
@@ -352,6 +320,10 @@ router.post("/verify-resume-payment", async (req, res) => {
     };
 
     await db.collection("payments").add(paymentRecord);
+
+    await db.collection("users").doc(uid).update({
+      hasPaidForResume: true,
+    });
 
     // Clean up OTP
     await db.collection("resume_otps").doc(uid).delete();
@@ -500,7 +472,7 @@ router.post("/webhook", async (req, res) => {
       const userDoc = await db.collection("users").doc(uid).get();
       if (userDoc.exists) {
         const userData = userDoc.data();
-        await sendPaymentConfirmationEmail(userData.email, paymentRecord, userData.name);
+        await sendPaymentConfirmationEmail(userData.email, paymentRecord, userData.name, userData.language || "en");
       }
 
       console.log(`Payment captured for UID: ${uid}, Amount: ₹${amount}`);
@@ -533,54 +505,45 @@ router.post("/webhook", async (req, res) => {
 });
 
 // Send payment confirmation email
-async function sendPaymentConfirmationEmail(email, payment, name) {
+async function sendPaymentConfirmationEmail(email, payment, name, language = "en") {
+  const templates = emailTemplates[language] || emailTemplates["en"];
+  
   const msg = {
     to: email,
     from: process.env.DEFAULT_FROM_EMAIL,
-    subject: "Resume Creation Payment Receipt - Internshala",
+    subject: templates.resume_receipt_subject,
     html: `
       <div style="font-family: Arial, sans-serif; background-color: #f4f4f4; padding: 20px;">
         <div style="background-color: white; padding: 30px; border-radius: 8px; max-width: 600px; margin: 0 auto;">
-          <h2 style="color: #333; margin-bottom: 20px;">Payment Successful!</h2>
+          <h2 style="color: #333; margin-bottom: 20px;">${templates.resume_receipt_title}</h2>
           <p style="color: #666; font-size: 16px; margin-bottom: 20px;">
             Hi ${name},<br><br>
-            Your payment for resume creation has been successfully processed.
+            ${templates.resume_receipt_body}
           </p>
           
           <div style="background-color: #f8f9fa; padding: 20px; border-radius: 4px; margin: 20px 0;">
-            <h3 style="color: #333; margin-top: 0;">Payment Details</h3>
+            <h3 style="color: #333; margin-top: 0;">${templates.subscription_invoice_subtitle}</h3>
             <table style="width: 100%; border-collapse: collapse;">
               <tr>
-                <td style="padding: 8px 0; color: #666;">Amount Paid:</td>
+                <td style="padding: 8px 0; color: #666;">${templates.amount_paid}:</td>
                 <td style="padding: 8px 0; color: #333; font-weight: bold; text-align: right;">₹${payment.amount}</td>
               </tr>
               <tr>
-                <td style="padding: 8px 0; color: #666;">Payment ID:</td>
+                <td style="padding: 8px 0; color: #666;">${templates.payment_id}:</td>
                 <td style="padding: 8px 0; color: #333; text-align: right; font-size: 12px;">${payment.razorpay_payment_id}</td>
               </tr>
               <tr>
-                <td style="padding: 8px 0; color: #666;">Order ID:</td>
+                <td style="padding: 8px 0; color: #666;">${templates.order_id}:</td>
                 <td style="padding: 8px 0; color: #333; text-align: right; font-size: 12px;">${payment.razorpay_order_id}</td>
               </tr>
               <tr>
-                <td style="padding: 8px 0; color: #666;">Date:</td>
+                <td style="padding: 8px 0; color: #666;">${templates.date_label}:</td>
                 <td style="padding: 8px 0; color: #333; text-align: right;">${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}</td>
               </tr>
             </table>
           </div>
-
-          <p style="color: #666; font-size: 16px; margin: 20px 0;">
-            You can now create your professional resume. Your resume will be saved to your profile.
-          </p>
-
-          <div style="background-color: #e3f2fd; padding: 15px; border-left: 4px solid #2196f3; margin: 20px 0;">
-            <p style="color: #1976d2; margin: 0; font-size: 14px;">
-              <strong>Note:</strong> This receipt serves as your payment confirmation. Please keep it for your records.
-            </p>
-          </div>
-
           <p style="color: #999; font-size: 12px; margin-top: 30px;">
-            If you have any questions, please contact our support team.
+            ${templates.otp_expiry_msg.split('.')[0]}
           </p>
         </div>
       </div>

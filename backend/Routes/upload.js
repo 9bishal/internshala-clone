@@ -58,6 +58,41 @@ const uploadToCloudinary = (buffer, folder, resourceType = 'auto') => {
   });
 };
 
+// POST /upload/single - Upload single media file
+router.post('/single', upload.single('file'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No file uploaded' });
+    }
+
+    const userId = req.body.userId || 'anonymous';
+    // Use the type to determine the custom folder, falling back to 'misc'
+    const type = req.body.type || 'misc';
+    const folder = `${type}/${userId}`;
+    const resourceType = req.file.mimetype.startsWith('video/') ? 'video' : 'image';
+
+    const result = await uploadToCloudinary(req.file.buffer, folder, resourceType);
+
+    res.json({
+      success: true,
+      url: result.secure_url,
+      publicId: result.public_id,
+      resourceType: result.resource_type,
+      format: result.format,
+      width: result.width,
+      height: result.height,
+      bytes: result.bytes
+    });
+
+  } catch (error) {
+    console.error('Single upload error:', error);
+    res.status(500).json({ 
+      error: 'Failed to upload file',
+      message: error.message 
+    });
+  }
+});
+
 // POST /upload/media - Upload multiple media files
 router.post('/media', upload.array('files', 10), async (req, res) => {
   try {

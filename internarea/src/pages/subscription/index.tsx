@@ -1,19 +1,29 @@
 import { useState, useEffect } from "react";
 import { useSelector } from "react-redux";
-import { selectuser } from "@/Feature/Userslice";
+import { selectuser, selectLanguage } from "@/Feature/Userslice";
 import axios from "axios";
 import { getApiEndpoint } from "@/utils/api";
 import { useRouter } from "next/router";
 import {
   Check,
-  X,
   Zap,
   Shield,
   Crown,
   ArrowLeft,
   Loader,
+  Clock,
+  AlertTriangle,
+  CreditCard,
+  CheckCircle,
 } from "lucide-react";
 import { toast } from "react-toastify";
+
+// Declare Razorpay on window
+declare global {
+  interface Window {
+    Razorpay: any;
+  }
+}
 
 interface Plan {
   id: string;
@@ -34,17 +44,29 @@ interface UserSubscription {
 export default function SubscriptionPlans() {
   const router = useRouter();
   const user = useSelector(selectuser);
+  const language = useSelector(selectLanguage) || "en";
   const [plans, setPlans] = useState<Plan[]>([]);
-  const [subscription, setSubscription] = useState<UserSubscription | null>(
-    null
-  );
+  const [subscription, setSubscription] = useState<UserSubscription | null>(null);
   const [loading, setLoading] = useState(true);
   const [subscribing, setSubscribing] = useState<string | null>(null);
   const [authChecked, setAuthChecked] = useState(false);
+  const [paymentSuccess, setPaymentSuccess] = useState(false);
+  const [successPlan, setSuccessPlan] = useState<string>("");
 
-  // Wait for auth to resolve before deciding to redirect
+  // Check if current time is within the 10 AM - 11 AM IST payment window
+  const isPaymentWindowOpen = () => {
+    const now = new Date();
+    const istTime = new Intl.DateTimeFormat("en-IN", {
+      timeZone: "Asia/Kolkata",
+      hour: "numeric",
+      hour12: false,
+    }).format(now);
+    const hour = parseInt(istTime);
+    return hour >= 10 && hour < 11;
+  };
+
+  // Wait for auth to resolve
   useEffect(() => {
-    // Give Firebase auth a moment to resolve the user state
     const timer = setTimeout(() => {
       setAuthChecked(true);
     }, 1500);
@@ -55,23 +77,29 @@ export default function SubscriptionPlans() {
     if (user) {
       fetchPlansAndSubscription();
     } else if (authChecked && !user) {
-      // Only redirect after auth has had time to resolve
       setLoading(false);
     }
   }, [user, authChecked]);
 
+  // Load Razorpay script dynamically
+  useEffect(() => {
+    const script = document.createElement("script");
+    script.src = "https://checkout.razorpay.com/v1/checkout.js";
+    script.async = true;
+    document.body.appendChild(script);
+    return () => {
+      document.body.removeChild(script);
+    };
+  }, []);
+
   const fetchPlansAndSubscription = async () => {
     try {
       setLoading(true);
-
-      // Fetch plans
-      const plansResponse = await axios.get(getApiEndpoint("/subscription/plans"));
+      const [plansResponse, subResponse] = await Promise.all([
+        axios.get(getApiEndpoint("/razorpay-subscription/plans")),
+        axios.get(getApiEndpoint(`/razorpay-subscription/${user.uid}`)),
+      ]);
       setPlans(plansResponse.data.plans);
-
-      // Fetch user's current subscription
-      const subResponse = await axios.get(
-        getApiEndpoint(`/subscription/${user.uid}`)
-      );
       setSubscription(subResponse.data);
     } catch (error: any) {
       console.error("Error fetching data:", error);
@@ -87,30 +115,127 @@ export default function SubscriptionPlans() {
       return;
     }
 
+    // Free plan - direct subscribe without payment
+    if (planId === "free") {
+      handleCancelSubscription();
+      return;
+    }
+
+    // TODO: Uncomment in production to enforce payment time window
+    // if (!isPaymentWindowOpen()) {
+    //   toast.error(
+    //     "⏰ Payments are only allowed between 10:00 AM and 11:00 AM IST. Please try again during this window.",
+    //     { autoClose: 6000 }
+    //   );
+    //   return;
+    // }
+
+    if (!window.Razorpay) {
+      toast.error("Payment system is loading. Please wait a moment and try again.");
+      return;
+    }
+
     setSubscribing(planId);
 
     try {
-      // For demo purposes, we'll use a fake payment token
-      const paymentToken = planId === "free" ? null : "demo_token_" + Date.now();
-
-      const response = await axios.post(getApiEndpoint("/subscription/subscribe"), {
+      // Step 1: Create order on backend
+      const orderRes = await axios.post(getApiEndpoint("/razorpay-subscription/create-order"), {
         uid: user.uid,
         planId,
-        paymentToken,
       });
 
-      toast.success(response.data.message);
-      setSubscription({
-        planId,
-        status: "active",
-        expiresAt: response.data.subscription.expiresAt,
-        planDetails: response.data.subscription.planDetails,
+      const { orderId, amount, currency, planDetails } = orderRes.data;
+
+      // Step 2: Open Razorpay checkout
+      const options = {
+        key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID,
+        amount,
+        currency,
+        name: "Internshala Clone",
+        description: `${planDetails.name} Subscription`,
+        order_id: orderId,
+        image: "/logo.png",
+        prefill: {
+          name: user.name || "",
+          email: user.email || "",
+        },
+        notes: {
+          uid: user.uid,
+          planId,
+        },
+        theme: {
+          color: "#4F46E5",
+        },
+        handler: async (response: any) => {
+          // Step 3: Verify payment on backend
+          try {
+            const verifyRes = await axios.post(
+              getApiEndpoint("/razorpay-subscription/verify-payment"),
+              {
+                uid: user.uid,
+                planId,
+                razorpay_order_id: response.razorpay_order_id,
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_signature: response.razorpay_signature,
+                language,
+              }
+            );
+
+            toast.success("🎉 Payment successful! Your subscription is now active.");
+            setSuccessPlan(planDetails.name);
+            setPaymentSuccess(true);
+            setSubscription({
+              planId,
+              status: "active",
+              expiresAt: verifyRes.data.subscription.expiresAt,
+              planDetails: verifyRes.data.subscription.planDetails,
+            });
+          } catch (verifyError: any) {
+            console.error("Payment verification failed:", verifyError);
+            toast.error("Payment verification failed. Please contact support.");
+          } finally {
+            setSubscribing(null);
+          }
+        },
+        modal: {
+          ondismiss: () => {
+            toast.info("Payment cancelled.");
+            setSubscribing(null);
+          },
+        },
+      };
+
+      const rzp = new window.Razorpay(options);
+
+      // Handle payment failure inside Razorpay
+      rzp.on("payment.failed", async (response: any) => {
+        console.error("Razorpay payment failed:", response.error);
+        toast.error(`Payment failed: ${response.error.description || "Unknown error"}`, {
+          autoClose: 6000,
+        });
+
+        // Notify backend to record failure and send failure email
+        try {
+          await axios.post(getApiEndpoint("/razorpay-subscription/payment-failed"), {
+            uid: user.uid,
+            planId,
+            razorpay_order_id: orderId,
+            error_code: response.error.code,
+            error_description: response.error.description,
+            language,
+          });
+        } catch (failErr) {
+          console.error("Could not record payment failure:", failErr);
+        }
+
+        setSubscribing(null);
       });
+
+      rzp.open();
     } catch (error: any) {
-      toast.error(
-        error.response?.data?.message || "Failed to subscribe"
-      );
-    } finally {
+      console.error("Error initiating payment:", error);
+      const msg = error.response?.data?.message || "Failed to initiate payment";
+      toast.error(msg, { autoClose: 6000 });
       setSubscribing(null);
     }
   };
@@ -130,16 +255,10 @@ export default function SubscriptionPlans() {
       const response = await axios.post(
         getApiEndpoint(`/subscription/cancel-subscription/${user.uid}`)
       );
-
       toast.success(response.data.message);
-      setSubscription({
-        planId: "free",
-        status: "cancelled",
-      });
+      setSubscription({ planId: "free", status: "cancelled" });
     } catch (error: any) {
-      toast.error(
-        error.response?.data?.message || "Failed to cancel subscription"
-      );
+      toast.error(error.response?.data?.message || "Failed to cancel subscription");
     } finally {
       setSubscribing(null);
     }
@@ -147,42 +266,26 @@ export default function SubscriptionPlans() {
 
   const formatExpiryDate = (date: any) => {
     if (!date) return "Lifetime";
-    
     try {
       let dateObj;
-      
-      // Handle Firestore Timestamp
       if (date.toDate && typeof date.toDate === "function") {
         dateObj = date.toDate();
-      } 
-      // Handle ISO string or timestamp
-      else if (typeof date === "string" || typeof date === "number") {
+      } else if (typeof date === "string" || typeof date === "number") {
         dateObj = new Date(date);
-      } 
-      // Handle Date object
-      else if (date instanceof Date) {
+      } else if (date instanceof Date) {
         dateObj = date;
-      } 
-      // Handle object with seconds (Firestore format)
-      else if (date._seconds || date.seconds) {
-        const seconds = date._seconds || date.seconds;
-        dateObj = new Date(seconds * 1000);
+      } else if (date._seconds || date.seconds) {
+        dateObj = new Date((date._seconds || date.seconds) * 1000);
       } else {
         return "N/A";
       }
-      
-      // Check if date is valid
-      if (isNaN(dateObj.getTime())) {
-        return "N/A";
-      }
-      
+      if (isNaN(dateObj.getTime())) return "N/A";
       return new Intl.DateTimeFormat("en-US", {
         year: "numeric",
         month: "short",
         day: "numeric",
       }).format(dateObj);
-    } catch (error) {
-      console.error("Error formatting date:", error);
+    } catch {
       return "N/A";
     }
   };
@@ -200,6 +303,55 @@ export default function SubscriptionPlans() {
     }
   };
 
+  const getPlanGradient = (planId: string) => {
+    switch (planId) {
+      case "bronze":
+        return "from-amber-600 to-amber-800";
+      case "silver":
+        return "from-slate-400 to-slate-600";
+      case "gold":
+        return "from-yellow-400 to-yellow-600";
+      default:
+        return "from-gray-400 to-gray-600";
+    }
+  };
+
+  // Payment time window indicator
+  const paymentWindowOpen = isPaymentWindowOpen();
+
+  if (paymentSuccess) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-green-50 via-white to-blue-50 flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl shadow-xl p-10 text-center max-w-md w-full">
+          <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
+            <CheckCircle className="w-10 h-10 text-green-600" />
+          </div>
+          <h1 className="text-3xl font-bold text-gray-900 mb-3">Payment Successful!</h1>
+          <p className="text-gray-600 mb-2">
+            You are now subscribed to the <span className="font-bold text-indigo-600">{successPlan}</span>.
+          </p>
+          <p className="text-sm text-gray-500 mb-8">
+            📧 An invoice has been sent to your registered email address.
+          </p>
+          <div className="space-y-3">
+            <button
+              onClick={() => { setPaymentSuccess(false); fetchPlansAndSubscription(); }}
+              className="w-full py-3 bg-indigo-600 text-white rounded-lg font-semibold hover:bg-indigo-700 transition"
+            >
+              View Subscription
+            </button>
+            <button
+              onClick={() => router.push("/internship")}
+              className="w-full py-3 bg-gray-100 text-gray-700 rounded-lg font-semibold hover:bg-gray-200 transition"
+            >
+              Browse Internships
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50 py-12 px-4">
       <div className="max-w-7xl mx-auto">
@@ -213,13 +365,43 @@ export default function SubscriptionPlans() {
             Back
           </button>
 
-          <h1 className="text-4xl font-bold text-gray-900 mb-4">
-            Choose Your Plan
-          </h1>
+          <h1 className="text-4xl font-bold text-gray-900 mb-4">Choose Your Plan</h1>
           <p className="text-xl text-gray-600">
             Select the perfect plan for your career growth
           </p>
         </div>
+
+        {/* TODO: Uncomment in production to show payment window status banner
+        <div
+          className={`mb-8 rounded-xl p-4 flex items-start gap-3 ${
+            paymentWindowOpen
+              ? "bg-green-50 border border-green-200"
+              : "bg-amber-50 border border-amber-200"
+          }`}
+        >
+          {paymentWindowOpen ? (
+            <>
+              <CreditCard className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="font-semibold text-green-800">Payment Window is Open</p>
+                <p className="text-green-700 text-sm">
+                  You can subscribe now. The payment window is open from 10:00 AM to 11:00 AM IST.
+                </p>
+              </div>
+            </>
+          ) : (
+            <>
+              <Clock className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="font-semibold text-amber-800">Payment Window is Closed</p>
+                <p className="text-amber-700 text-sm">
+                  Payments are only accepted between <strong>10:00 AM – 11:00 AM IST</strong>. Please come back during this window to subscribe.
+                </p>
+              </div>
+            </>
+          )}
+        </div>
+        */}
 
         {/* Current Subscription Info */}
         {subscription && subscription.planId !== "free" && (
@@ -244,17 +426,19 @@ export default function SubscriptionPlans() {
                 <button
                   onClick={handleCancelSubscription}
                   disabled={subscribing === "cancel"}
-                  className="text-red-600 hover:text-red-700 font-medium text-sm disabled:opacity-50"
+                  className="text-red-600 hover:text-red-700 font-medium text-sm disabled:opacity-50 flex items-center gap-1"
                 >
-                  {subscribing === "cancel" ? "Cancelling..." : "Cancel Plan"}
+                  {subscribing === "cancel" ? (
+                    <><Loader className="w-4 h-4 animate-spin" /> Cancelling...</>
+                  ) : "Cancel Plan"}
                 </button>
               )}
             </div>
           </div>
         )}
 
-        {/* Loading State */}
-        {loading && !authChecked ? (
+        {/* Loading / Unauthenticated States */}
+        {(loading && !authChecked) || (loading && user) ? (
           <div className="text-center py-16">
             <Loader className="w-8 h-8 text-gray-400 animate-spin mx-auto mb-4" />
             <p className="text-gray-600">Loading plans...</p>
@@ -271,87 +455,59 @@ export default function SubscriptionPlans() {
               Go to Login
             </button>
           </div>
-        ) : loading ? (
-          <div className="text-center py-16">
-            <Loader className="w-8 h-8 text-gray-400 animate-spin mx-auto mb-4" />
-            <p className="text-gray-600">Loading plans...</p>
-          </div>
         ) : (
           /* Plans Grid */
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {plans.map((plan) => {
               const isCurrentPlan = subscription?.planId === plan.id;
-              const isPopular = plan.id === "silver"; // Silver is the most popular mid-tier plan
+              const isPopular = plan.id === "silver";
+              const gradient = getPlanGradient(plan.id);
 
               return (
                 <div
                   key={plan.id}
                   className={`relative rounded-2xl overflow-hidden transition-all transform hover:scale-105 ${
-                    isPopular ? "ring-2 ring-purple-500" : ""
+                    isPopular ? "ring-2 ring-purple-500 shadow-2xl" : "shadow-lg"
                   }`}
                 >
                   {isPopular && (
-                    <div className="absolute top-0 right-0 bg-gradient-to-r from-purple-600 to-pink-600 text-white px-4 py-1 text-sm font-semibold rounded-bl-lg">
+                    <div className="absolute top-0 right-0 bg-gradient-to-r from-purple-600 to-pink-600 text-white px-3 py-1 text-xs font-semibold rounded-bl-lg z-10">
                       Most Popular
                     </div>
                   )}
 
-                  <div
-                    className={`bg-white rounded-2xl shadow-lg overflow-hidden h-full flex flex-col ${
-                      isPopular ? "shadow-2xl" : ""
-                    }`}
-                  >
+                  <div className="bg-white rounded-2xl overflow-hidden h-full flex flex-col">
                     {/* Plan Header */}
-                    <div
-                      className={`px-6 py-8 ${
-                        isPopular
-                          ? "bg-gradient-to-r from-purple-600 to-pink-600 text-white"
-                          : "bg-gradient-to-r from-gray-100 to-gray-200 text-gray-900"
-                      }`}
-                    >
-                      <div className="flex items-start justify-between mb-4">
+                    <div className={`bg-gradient-to-r ${gradient} px-6 py-6 text-white`}>
+                      <div className="flex items-start justify-between mb-3">
                         <div>
-                          <h3 className="text-2xl font-bold">{plan.name}</h3>
+                          <h3 className="text-xl font-bold">{plan.name}</h3>
                           {plan.duration && (
-                            <p
-                              className={`text-sm mt-1 ${
-                                isPopular ? "text-purple-100" : "text-gray-600"
-                              }`}
-                            >
-                              {plan.duration} days
-                            </p>
+                            <p className="text-xs opacity-80 mt-0.5">{plan.duration} days</p>
                           )}
                         </div>
-                        {getPlanIcon(plan.id)}
+                        <div className="bg-white bg-opacity-20 rounded-full p-2">
+                          {getPlanIcon(plan.id)}
+                        </div>
                       </div>
 
                       <div className="flex items-baseline gap-1">
-                        <span className="text-4xl font-bold">
-                          ₹{plan.price}
-                        </span>
-                        {plan.duration && (
-                          <span
-                            className={`text-sm ${
-                              isPopular
-                                ? "text-purple-200"
-                                : "text-gray-600"
-                            }`}
-                          >
-                            /month
-                          </span>
+                        <span className="text-3xl font-bold">₹{plan.price}</span>
+                        {plan.price > 0 && (
+                          <span className="text-sm opacity-80">/month</span>
+                        )}
+                        {plan.price === 0 && (
+                          <span className="text-sm opacity-80">Free forever</span>
                         )}
                       </div>
                     </div>
 
                     {/* Features */}
-                    <div className="flex-grow px-6 py-8">
-                      <ul className="space-y-4">
+                    <div className="flex-grow px-5 py-5">
+                      <ul className="space-y-3">
                         {plan.features.map((feature, idx) => (
-                          <li
-                            key={idx}
-                            className="flex items-start gap-3 text-sm text-gray-700"
-                          >
-                            <Check className="w-5 h-5 text-green-500 flex-shrink-0 mt-0.5" />
+                          <li key={idx} className="flex items-start gap-2 text-sm text-gray-700">
+                            <Check className="w-4 h-4 text-green-500 flex-shrink-0 mt-0.5" />
                             <span>{feature}</span>
                           </li>
                         ))}
@@ -359,31 +515,38 @@ export default function SubscriptionPlans() {
                     </div>
 
                     {/* Action Button */}
-                    <div className="px-6 py-6 border-t border-gray-200">
+                    <div className="px-5 py-5 border-t border-gray-100">
                       {isCurrentPlan ? (
-                        <button
-                          disabled
-                          className="w-full py-3 bg-gray-200 text-gray-700 rounded-lg font-semibold cursor-not-allowed"
-                        >
+                        <div className="w-full py-3 bg-green-50 border border-green-200 text-green-700 rounded-lg font-semibold text-center text-sm">
                           ✓ Current Plan
+                        </div>
+                      ) : plan.price === 0 ? (
+                        <button
+                          onClick={() => router.push("/internship")}
+                          className="w-full py-3 rounded-lg font-semibold text-sm bg-gray-100 text-gray-800 hover:bg-gray-200 transition"
+                        >
+                          Browse Internships
                         </button>
                       ) : (
                         <button
                           onClick={() => handleSubscribe(plan.id)}
-                          disabled={subscribing === plan.id}
-                          className={`w-full py-3 rounded-lg font-semibold transition-all ${
+                          disabled={!!subscribing}
+                          className={`w-full py-3 rounded-lg font-semibold text-sm transition-all flex items-center justify-center gap-2 ${
                             isPopular
-                              ? "bg-gradient-to-r from-purple-600 to-pink-600 text-white hover:shadow-lg disabled:opacity-50"
-                              : "bg-gray-100 text-gray-900 hover:bg-gray-200 disabled:opacity-50"
+                              ? "bg-gradient-to-r from-purple-600 to-pink-600 text-white hover:shadow-lg disabled:opacity-60"
+                              : `bg-gradient-to-r ${gradient} text-white hover:shadow-lg disabled:opacity-60`
                           }`}
                         >
                           {subscribing === plan.id ? (
                             <>
-                              <Loader className="w-4 h-4 inline mr-2 animate-spin" />
-                              Subscribing...
+                              <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full" />
+                              <span>Processing...</span>
                             </>
                           ) : (
-                            `Subscribe to ${plan.name}`
+                            <>
+                              <CreditCard className="w-4 h-4" />
+                              <span>Subscribe — ₹{plan.price}</span>
+                            </>
                           )}
                         </button>
                       )}
@@ -392,6 +555,19 @@ export default function SubscriptionPlans() {
                 </div>
               );
             })}
+          </div>
+        )}
+
+        {/* Razorpay Note */}
+        {user && !loading && (
+          <div className="mt-8 text-center">
+            <p className="text-sm text-gray-500 flex items-center justify-center gap-2">
+              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none">
+                <rect width="24" height="24" rx="4" fill="#072654" />
+                <path d="M7 17L12 7L17 17" stroke="#3395FF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              Secured by Razorpay • Test mode — use card 4111 1111 1111 1111 / any future date / any CVV
+            </p>
           </div>
         )}
 
@@ -404,29 +580,24 @@ export default function SubscriptionPlans() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {[
               {
-                q: "Can I change my plan anytime?",
-                a: "Yes, you can upgrade or downgrade your plan at any time. Changes take effect immediately.",
+                q: "When can I make payments?",
+                a: "Payments are only accepted between 10:00 AM and 11:00 AM IST as per platform policy.",
               },
               {
                 q: "What payment methods do you accept?",
-                a: "We accept all major credit cards, debit cards, and digital wallets through our secure payment gateway.",
+                a: "We accept all major credit/debit cards, UPI, net banking, and digital wallets through Razorpay.",
               },
               {
-                q: "Is there a money-back guarantee?",
-                a: "Yes, if you're not satisfied within 7 days, we offer a full refund, no questions asked.",
+                q: "Will I receive an invoice?",
+                a: "Yes! After successful payment, a detailed invoice is automatically sent to your registered email address.",
               },
               {
-                q: "Do you offer discounts for annual plans?",
-                a: "Yes! Subscribe to annual plans and save up to 30% compared to monthly billing.",
+                q: "What if my payment fails?",
+                a: "If payment fails, no amount is deducted. You'll receive an email notification explaining what happened and how to retry.",
               },
             ].map((item, idx) => (
-              <div
-                key={idx}
-                className="bg-white rounded-lg shadow-md p-6"
-              >
-                <h4 className="font-semibold text-gray-900 mb-3">
-                  {item.q}
-                </h4>
+              <div key={idx} className="bg-white rounded-lg shadow-md p-6">
+                <h4 className="font-semibold text-gray-900 mb-3">{item.q}</h4>
                 <p className="text-gray-600">{item.a}</p>
               </div>
             ))}

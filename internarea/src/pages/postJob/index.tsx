@@ -1,15 +1,5 @@
-import { User, Lock } from "lucide-react";
-import React, { useState } from "react";
-import {
-  Briefcase,
-  Building2,
-  MapPin,
-  Tags,
-  Info,
-  Users,
-  DollarSign,
-  Calendar,
-} from "lucide-react";
+import { User, Lock, Briefcase, Building2, MapPin, Tags, Info, Users, DollarSign, Calendar } from "lucide-react";
+import React, { useState, useEffect } from "react";
 import { toast } from "react-toastify";
 import axios from "axios";
 import { useRouter } from "next/navigation";
@@ -19,6 +9,16 @@ import { selectuser } from "@/Feature/Userslice";
 
 const index = () => {
   const user = useSelector(selectuser);
+  const router = useRouter();
+  const [isloading, setisloading] = useState(false);
+
+  React.useEffect(() => {
+    const token = localStorage.getItem("adminToken");
+    if (!token) {
+      router.push("/adminlogin");
+    }
+  }, [router]);
+
   const [formData, setFormData] = useState({
     title: "",
     company: "",
@@ -33,8 +33,7 @@ const index = () => {
     startDate: "",
     AdditionalInfo: "",
   });
-  const router = useRouter();
-  const [isloading, setisloading] = useState(false);
+
   const handleChange = (e: any) => {
     const { name, value } = e.target;
 

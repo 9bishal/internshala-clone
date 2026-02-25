@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
-import { useSelector } from "react-redux";
-import { selectuser } from "@/Feature/Userslice";
+import { useSelector, useDispatch } from "react-redux";
+import { selectuser, setLanguage } from "@/Feature/Userslice";
 import axios from "axios";
 import { getApiEndpoint } from "@/utils/api";
 import { useRouter } from "next/router";
@@ -22,6 +22,7 @@ interface Language {
 
 export default function LanguagePreferences() {
   const router = useRouter();
+  const dispatch = useDispatch();
   const user = useSelector(selectuser);
   const [languages, setLanguages] = useState<Language[]>([]);
   const [currentLanguage, setCurrentLanguage] = useState("en");
@@ -100,9 +101,12 @@ export default function LanguagePreferences() {
           }
         );
 
-        toast.success(response.data.message);
-        setCurrentLanguage(languageCode);
-        setSelectedLanguage(null);
+        setTimeout(() => {
+          dispatch(setLanguage(languageCode));
+          setCurrentLanguage(languageCode);
+          setSelectedLanguage(null);
+          toast.success(response.data.message);
+        }, 1500);
       } catch (error: any) {
         toast.error(
           error.response?.data?.message || "Failed to change language"
@@ -130,17 +134,22 @@ export default function LanguagePreferences() {
         }
       );
 
-      toast.success(response.data.message);
-      setCurrentLanguage(selectedLanguage);
-      setShowOTPModal(false);
-      setOtp("");
-      setSelectedLanguage(null);
-      setStep("select");
+      // Simulate a small loading delay to give user feedback
+      setTimeout(() => {
+        dispatch(setLanguage(selectedLanguage));
+        setCurrentLanguage(selectedLanguage);
+        setShowOTPModal(false);
+        setOtp("");
+        setSelectedLanguage(null);
+        setStep("select");
+        setVerifying(false); // only finish verifying when done
+        toast.success(response.data.message);
+      }, 1500);
+      
     } catch (error: any) {
       toast.error(
         error.response?.data?.message || "Failed to verify OTP"
       );
-    } finally {
       setVerifying(false);
     }
   };
@@ -284,9 +293,16 @@ export default function LanguagePreferences() {
                 <button
                   onClick={handleVerifyOTP}
                   disabled={!otp || verifying}
-                  className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors flex justify-center items-center disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {verifying ? "Verifying..." : "Verify & Change Language"}
+                  {verifying ? (
+                    <>
+                      <Loader className="w-5 h-5 mr-2 animate-spin" />
+                      Verifying...
+                    </>
+                  ) : (
+                    "Verify & Change Language"
+                  )}
                 </button>
 
                 <button

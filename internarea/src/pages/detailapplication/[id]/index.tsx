@@ -8,18 +8,21 @@ const index = () => {
   const router = useRouter();
   const { id } = router.query;
   const [loading, setloading] = useState(false);
-  const [data, setdata] = useState<any>([]);
+  const [data, setdata] = useState<any>(null);
+  const [error, seterror] = useState<string | null>(null);
   useEffect(() => {
     const fetchdata = async () => {
       try {
         setloading(true);
+        seterror(null);
         const res = await axios.get(
           getApiEndpoint(`/application/${id}`)
         );
         console.log("✅ Application detail fetched:", res.data);
         setdata(res.data);
-      } catch (error) {
+      } catch (error: any) {
         console.error("❌ Error fetching application detail:", error);
+        seterror(error.response?.data?.error || "Application not found");
       } finally {
         setloading(false);
       }
@@ -28,7 +31,25 @@ const index = () => {
       fetchdata();
     }
   }, [id]);
-  if (loading) {
+  if (error) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center p-4">
+        <div className="bg-red-50 border border-red-200 rounded-lg p-8 text-center max-w-md">
+          <div className="text-4xl mb-4">⚠️</div>
+          <h2 className="text-xl font-bold text-red-800 mb-2">Error</h2>
+          <p className="text-red-600 mb-6">{error}</p>
+          <button
+            onClick={() => router.back()}
+            className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+          >
+            Go Back
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (loading || !data) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <Loader2 className="w-8 h-8 animate-spin text-blue-600" />

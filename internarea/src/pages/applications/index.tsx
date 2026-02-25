@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { getApiEndpoint } from "@/utils/api";
 import Link from "next/link";
+import { useRouter } from "next/router";
 import React, { useEffect, useState } from "react";
 import { toast } from "react-toastify";
 import { useSelector } from "react-redux";
@@ -52,6 +53,15 @@ const getStatusColor = (status: any) => {
 };
 const index = () => {
   const currentUser = useSelector(selectuser);
+  const router = useRouter();
+
+  useEffect(() => {
+    const token = localStorage.getItem("adminToken");
+    if (!token) {
+      router.push("/adminlogin");
+    }
+  }, [router]);
+
   const [searchTerm, setsearchTerm] = useState("");
   const [filter, setFilter] = useState("all");
   const [data, setdata] = useState<any>([]);

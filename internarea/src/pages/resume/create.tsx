@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useSelector } from "react-redux";
-import { selectuser } from "@/Feature/Userslice";
+import { selectuser, selectLanguage } from "@/Feature/Userslice";
 import axios from "axios";
 import { getApiEndpoint } from "@/utils/api";
 import { useRouter } from "next/router";
@@ -26,12 +26,14 @@ declare global {
 export default function CreateResume() {
   const router = useRouter();
   const user = useSelector(selectuser);
+  const language = useSelector(selectLanguage);
   const [loading, setLoading] = useState(true);
   const [currentStep, setCurrentStep] = useState(1);
   const [otp, setOtp] = useState("");
   const [otpSent, setOtpSent] = useState(false);
   const [verifyingOTP, setVerifyingOTP] = useState(false);
   const [otpVerified, setOtpVerified] = useState(false);
+  const [requestingOTP, setRequestingOTP] = useState(false);
   const [processingPayment, setProcessingPayment] = useState(false);
   const [userSubscription, setUserSubscription] = useState<any>(null);
 
@@ -48,21 +50,21 @@ export default function CreateResume() {
     try {
       setLoading(true);
       const response = await axios.get(
-        getApiEndpoint(`/razorpay-subscription/${user.uid}`)
+        getApiEndpoint(`/resume/access/${user.uid}`)
       );
 
-      const subscription = response.data;
-      setUserSubscription(subscription);
+      const access = response.data;
+      setUserSubscription(access.planDetails);
 
-      // Check if user has premium plan
-      const premiumPlans = ["bronze", "silver", "gold"];
-      if (!premiumPlans.includes(subscription?.planId?.toLowerCase())) {
-        toast.error("Resume creation requires a premium subscription");
-        router.push("/subscription");
+      // Wait, let any user request the OTP and pay the Rs 50.
+      if (access.hasPaidForResume) {
+        toast.success("Resume creation already unlocked!");
+        router.push("/resume-editor");
+        return;
       }
     } catch (error: any) {
-      console.error("Error checking subscription:", error);
-      toast.error("Failed to verify subscription");
+      console.error("Error checking access:", error);
+      toast.error("Failed to verify access");
       router.push("/subscription");
     } finally {
       setLoading(false);
@@ -70,11 +72,13 @@ export default function CreateResume() {
   };
 
   const handleRequestOTP = async () => {
+    setRequestingOTP(true);
     try {
       const response = await axios.post(
         getApiEndpoint("/resume-razorpay/request-otp"),
         {
           uid: user.uid,
+          language: language,
         }
       );
 
@@ -87,6 +91,8 @@ export default function CreateResume() {
       } else {
         toast.error(error.response?.data?.message || "Failed to send OTP");
       }
+    } finally {
+      setRequestingOTP(false);
     }
   };
 
@@ -327,9 +333,17 @@ export default function CreateResume() {
                 <div className="text-center">
                   <button
                     onClick={handleRequestOTP}
-                    className="bg-blue-600 text-white px-8 py-3 rounded-lg hover:bg-blue-700 transition"
+                    disabled={requestingOTP}
+                    className="bg-blue-600 text-white px-8 py-3 rounded-lg hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center mx-auto"
                   >
-                    Send OTP
+                    {requestingOTP ? (
+                      <>
+                        <Loader className="w-5 h-5 animate-spin mr-2" />
+                        Sending...
+                      </>
+                    ) : (
+                      "Send OTP"
+                    )}
                   </button>
                 </div>
               ) : (
@@ -368,9 +382,14 @@ export default function CreateResume() {
 
                     <button
                       onClick={handleRequestOTP}
-                      className="px-6 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 transition"
+                      disabled={requestingOTP}
+                      className="px-6 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 transition disabled:opacity-50 disabled:cursor-not-allowed flex justify-center items-center"
                     >
-                      Resend
+                      {requestingOTP ? (
+                        <Loader className="w-5 h-5 animate-spin" />
+                      ) : (
+                        "Resend"
+                      )}
                     </button>
                   </div>
 
@@ -412,6 +431,22 @@ export default function CreateResume() {
                     </div>
                   </div>
                 </div>
+
+                {processingPayment && (
+                  <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-6">
+                    <div className="flex">
+                      <AlertCircle className="h-5 w-5 text-yellow-600 mr-3 flex-shrink-0" />
+                      <div>
+                        <p className="text-sm font-semibold text-yellow-800">
+                          Please do not close or refresh this window.
+                        </p>
+                        <p className="text-xs text-yellow-700 mt-1">
+                          Doing so may lead to payment failure. Wait for the transaction to complete.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 <button
                   onClick={initiatePayment}

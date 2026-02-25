@@ -21,6 +21,8 @@ import {
   Award,
   CheckCircle,
   X,
+  Link as LinkIcon,
+  FolderGit2
 } from "lucide-react";
 import { toast } from "react-toastify";
 
@@ -46,6 +48,19 @@ interface Education {
   percentage: string;
 }
 
+interface Project {
+  id: string;
+  title: string;
+  link: string;
+  description: string;
+}
+
+interface LinkItem {
+  id: string;
+  label: string;
+  url: string;
+}
+
 interface ResumeData {
   fullName: string;
   email: string;
@@ -56,6 +71,8 @@ interface ResumeData {
   experience: Experience[];
   education: Education[];
   skills: string[];
+  projects: Project[];
+  links: LinkItem[];
 }
 
 export default function ResumeEditor() {
@@ -69,6 +86,7 @@ export default function ResumeEditor() {
   const [otpSent, setOtpSent] = useState(false);
   const [verifyingOTP, setVerifyingOTP] = useState(false);
   const [otpVerified, setOtpVerified] = useState(false);
+  const [requestingOTP, setRequestingOTP] = useState(false);
   const [photoUploading, setPhotoUploading] = useState(false);
   const [resumeId, setResumeId] = useState<string | null>(null);
 
@@ -82,6 +100,8 @@ export default function ResumeEditor() {
     experience: [],
     education: [],
     skills: [],
+    projects: [],
+    links: [],
   });
 
   const [newSkill, setNewSkill] = useState("");
@@ -108,19 +128,20 @@ export default function ResumeEditor() {
       if (access.canCreateResume) {
         setHasAccess(true);
       } else {
-        toast.error("Resume creation requires a premium plan (Bronze, Silver, or Gold)");
-        router.push("/subscription");
+        toast.error("Please unlock resume creation first");
+        router.push("/resume/create");
       }
     } catch (error: any) {
       console.error("Error checking access:", error);
-      toast.error("Failed to verify access. Redirecting to subscription page...");
-      setTimeout(() => router.push("/subscription"), 2000);
+      toast.error("Failed to verify access. Redirecting...");
+      setTimeout(() => router.push("/resume/create"), 2000);
     } finally {
       setLoading(false);
     }
   };
 
   const handleRequestOTP = async () => {
+    setRequestingOTP(true);
     try {
       const response = await axios.post(
         getApiEndpoint("/resume/request-otp"),
@@ -135,6 +156,8 @@ export default function ResumeEditor() {
       toast.error(
         error.response?.data?.message || "Failed to send OTP"
       );
+    } finally {
+      setRequestingOTP(false);
     }
   };
 
@@ -272,7 +295,7 @@ export default function ResumeEditor() {
       formData.append("type", "resume-photo");
 
       const response = await axios.post(
-        getApiEndpoint("/upload/media"),
+        getApiEndpoint("/upload/single"),
         formData,
         {
           headers: {
@@ -370,6 +393,58 @@ export default function ResumeEditor() {
     });
   };
 
+  const addProject = () => {
+    setResumeData({
+      ...resumeData,
+      projects: [
+        ...resumeData.projects,
+        { id: Date.now().toString(), title: "", link: "", description: "" },
+      ],
+    });
+  };
+
+  const updateProject = (id: string, field: string, value: string) => {
+    setResumeData({
+      ...resumeData,
+      projects: resumeData.projects.map((proj) =>
+        proj.id === id ? { ...proj, [field]: value } : proj
+      ),
+    });
+  };
+
+  const removeProject = (id: string) => {
+    setResumeData({
+      ...resumeData,
+      projects: resumeData.projects.filter((proj) => proj.id !== id),
+    });
+  };
+
+  const addLink = () => {
+    setResumeData({
+      ...resumeData,
+      links: [
+        ...resumeData.links,
+        { id: Date.now().toString(), label: "", url: "" },
+      ],
+    });
+  };
+
+  const updateLink = (id: string, field: string, value: string) => {
+    setResumeData({
+      ...resumeData,
+      links: resumeData.links.map((link) =>
+        link.id === id ? { ...link, [field]: value } : link
+      ),
+    });
+  };
+
+  const removeLink = (id: string) => {
+    setResumeData({
+      ...resumeData,
+      links: resumeData.links.filter((link) => link.id !== id),
+    });
+  };
+
   const handleSaveResume = async () => {
     // Validate required fields
     if (!resumeData.fullName || !resumeData.email || !resumeData.phone) {
@@ -401,6 +476,11 @@ export default function ResumeEditor() {
         uid: user.uid,
         resumeId: response.data.resumeId,
       });
+
+      // Auto trigger download
+      setTimeout(() => {
+        handleDownloadResume();
+      }, 500);
     } catch (error: any) {
       toast.error(
         error.response?.data?.message || "Failed to save resume"
@@ -410,9 +490,128 @@ export default function ResumeEditor() {
     }
   };
 
-  const handleDownloadResume = () => {
-    toast.info("Generating PDF...");
-    // This would trigger PDF generation
+  const handleDownloadResume = async () => {
+    toast.info("Generating PDF summary...");
+    // Generate an HTML string holding the professional resume template
+    const resumeHTML = `
+      <html>
+        <head>
+          <title>Resume - ${resumeData.fullName}</title>
+          <style>
+            body { font-family: 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 40px; }
+            .header { text-align: center; border-bottom: 2px solid #2c3e50; padding-bottom: 20px; margin-bottom: 30px; }
+            h1 { color: #2c3e50; margin: 0 0 10px 0; font-size: 32px; letter-spacing: 1px; text-transform: uppercase; }
+            h2 { color: #2980b9; font-size: 20px; margin-top: 30px; margin-bottom: 15px; border-bottom: 1px solid #ddd; padding-bottom: 5px; text-transform: uppercase; letter-spacing: 1px; }
+            .contact-info { margin-bottom: 10px; color: #555; font-size: 14px; }
+            .section { margin-bottom: 25px; }
+            .item { margin-bottom: 20px; }
+            .item-header { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 5px; }
+            .item-title { font-weight: bold; color: #2c3e50; font-size: 16px; }
+            .item-subtitle { color: #7f8c8d; font-style: italic; font-size: 14px; }
+            .description { margin-top: 5px; font-size: 14px; color: #444; }
+            ul.link-list { list-style: none; padding: 0; margin: 0; }
+            ul.link-list li { margin-bottom: 5px; font-size: 14px; }
+            .skills-container { display: flex; flex-wrap: wrap; gap: 8px; }
+            .skill-tag { background: #f0f4f8; border: 1px solid #dce4ec; color: #2c3e50; padding: 4px 10px; border-radius: 4px; font-size: 13px; font-weight: 500; }
+            a { color: #2980b9; text-decoration: none; }
+            img.photo { width: 100px; height: 100px; border-radius: 50%; object-fit: cover; margin-bottom: 15px; }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            ${resumeData.photo ? `<img src="${resumeData.photo}" class="photo" alt="Profile Photo" />` : ''}
+            <h1>${resumeData.fullName || 'Your Name'}</h1>
+            <div class="contact-info">
+              ${resumeData.email || ''} 
+              ${resumeData.phone ? ` | ${resumeData.phone}` : ''} 
+              ${resumeData.address ? ` | ${resumeData.address}` : ''}
+            </div>
+          </div>
+          
+          ${resumeData.summary ? `
+          <div class="section">
+            <h2>Professional Summary</h2>
+            <div class="description">${resumeData.summary}</div>
+          </div>
+          ` : ''}
+
+          ${resumeData.experience && resumeData.experience.length > 0 ? `
+          <div class="section">
+            <h2>Experience</h2>
+            ${resumeData.experience.map(exp => `
+              <div class="item">
+                <div class="item-header">
+                  <span class="item-title">${exp.position} at ${exp.company}</span>
+                  <span class="item-subtitle">${exp.duration}</span>
+                </div>
+                <div class="description">${exp.description}</div>
+              </div>
+            `).join('')}
+          </div>
+          ` : ''}
+
+          ${resumeData.projects && resumeData.projects.length > 0 ? `
+          <div class="section">
+            <h2>Projects</h2>
+            ${resumeData.projects.map(proj => `
+              <div class="item">
+                <div class="item-header">
+                  <span class="item-title">${proj.title} ${proj.link ? `- <a href="${proj.link}">${proj.link}</a>` : ''}</span>
+                </div>
+                <div class="description">${proj.description}</div>
+              </div>
+            `).join('')}
+          </div>
+          ` : ''}
+
+          ${resumeData.education && resumeData.education.length > 0 ? `
+          <div class="section">
+            <h2>Education</h2>
+            ${resumeData.education.map(edu => `
+              <div class="item">
+                <div class="item-header">
+                  <span class="item-title">${edu.degree}</span>
+                  <span class="item-subtitle">${edu.year}</span>
+                </div>
+                <div class="item-subtitle">${edu.institution} ${edu.percentage ? `| ${edu.percentage}` : ''}</div>
+              </div>
+            `).join('')}
+          </div>
+          ` : ''}
+
+          ${resumeData.skills && resumeData.skills.length > 0 ? `
+          <div class="section">
+            <h2>Skills</h2>
+            <div class="skills-container">
+              ${resumeData.skills.map(skill => `<span class="skill-tag">${skill}</span>`).join('')}
+            </div>
+          </div>
+          ` : ''}
+          
+          ${resumeData.links && resumeData.links.length > 0 ? `
+          <div class="section">
+            <h2>Links</h2>
+            <ul class="link-list">
+              ${resumeData.links.map(link => `
+                <li><strong>${link.label}:</strong> <a href="${link.url}">${link.url}</a></li>
+              `).join('')}
+            </ul>
+          </div>
+          ` : ''}
+        </body>
+      </html>
+    `;
+
+    const printWindow = window.open('', '_blank', 'width=800,height=900');
+    if (printWindow) {
+      printWindow.document.write(resumeHTML);
+      printWindow.document.close();
+      printWindow.focus();
+      // Only print after the images/styles have loaded
+      setTimeout(() => {
+        printWindow.print();
+      }, 500);
+    }
   };
 
   if (loading) {
@@ -448,6 +647,12 @@ export default function ResumeEditor() {
               <p className="text-gray-600 mt-2">
                 Fill in your details to generate a professional resume
               </p>
+              <div className="mt-4 bg-yellow-50 border border-yellow-200 rounded p-4 max-w-2xl">
+                <p className="text-yellow-800 font-medium text-sm">
+                  ⚠️ <strong>Important</strong>: Do not close or refresh this page. Once saved, this resume cannot be edited without a new payment. 
+                  A PDF will automatically download when you click Save.
+                </p>
+              </div>
             </div>
             {resumeId && (
               <CheckCircle className="w-12 h-12 text-green-500" />
@@ -808,6 +1013,113 @@ export default function ResumeEditor() {
               ))}
             </div>
           </div>
+
+          {/* Links Section */}
+          <div className="mb-8">
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center">
+                <LinkIcon className="w-6 h-6 text-blue-600 mr-2" />
+                <h2 className="text-2xl font-bold text-gray-900">Links</h2>
+              </div>
+              <button
+                onClick={addLink}
+                className="flex items-center text-blue-600 hover:text-blue-700 font-medium"
+              >
+                <Plus className="w-5 h-5 mr-1" />
+                Add Link
+              </button>
+            </div>
+
+            {resumeData.links.map((link) => (
+              <div key={link.id} className="bg-gray-50 rounded-lg p-6 mb-4 relative group">
+                <button
+                  onClick={() => removeLink(link.id)}
+                  className="absolute top-4 right-4 text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                >
+                  <Trash2 className="w-5 h-5" />
+                </button>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Label (e.g. GitHub, LinkedIn)</label>
+                    <input
+                      type="text"
+                      value={link.label}
+                      onChange={(e) => updateLink(link.id, "label", e.target.value)}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">URL</label>
+                    <input
+                      type="url"
+                      value={link.url}
+                      onChange={(e) => updateLink(link.id, "url", e.target.value)}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Projects Section */}
+          <div className="mb-8">
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center">
+                <FolderGit2 className="w-6 h-6 text-blue-600 mr-2" />
+                <h2 className="text-2xl font-bold text-gray-900">Projects</h2>
+              </div>
+              <button
+                onClick={addProject}
+                className="flex items-center text-blue-600 hover:text-blue-700 font-medium"
+              >
+                <Plus className="w-5 h-5 mr-1" />
+                Add Project
+              </button>
+            </div>
+
+            {resumeData.projects.map((proj) => (
+              <div key={proj.id} className="bg-gray-50 rounded-lg p-6 mb-4 relative group">
+                <button
+                  onClick={() => removeProject(proj.id)}
+                  className="absolute top-4 right-4 text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                >
+                  <Trash2 className="w-5 h-5" />
+                </button>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Project Title</label>
+                    <input
+                      type="text"
+                      value={proj.title}
+                      onChange={(e) => updateProject(proj.id, "title", e.target.value)}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Project Link (Optional)</label>
+                    <input
+                      type="url"
+                      value={proj.link}
+                      onChange={(e) => updateProject(proj.id, "link", e.target.value)}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Description</label>
+                  <textarea
+                    value={proj.description}
+                    onChange={(e) => updateProject(proj.id, "description", e.target.value)}
+                    rows={3}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  ></textarea>
+                </div>
+              </div>
+            ))}
+          </div>
+
         </div>
 
         {/* Action Buttons */}
@@ -859,9 +1171,17 @@ export default function ResumeEditor() {
                 </p>
                 <button
                   onClick={handleRequestOTP}
-                  className="w-full py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                  disabled={requestingOTP}
+                  className="w-full py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 flex items-center justify-center"
                 >
-                  Send OTP
+                  {requestingOTP ? (
+                    <>
+                      <Loader className="w-5 h-5 animate-spin mr-2" />
+                      Sending...
+                    </>
+                  ) : (
+                    "Send OTP"
+                  )}
                 </button>
               </div>
             ) : (
@@ -893,9 +1213,14 @@ export default function ResumeEditor() {
                 </button>
                 <button
                   onClick={handleRequestOTP}
-                  className="w-full py-2 text-blue-600 hover:text-blue-700 text-sm"
+                  disabled={requestingOTP}
+                  className="w-full py-2 text-blue-600 hover:text-blue-700 text-sm disabled:opacity-50 flex justify-center items-center"
                 >
-                  Resend OTP
+                  {requestingOTP ? (
+                    <Loader className="w-4 h-4 animate-spin" />
+                  ) : (
+                    "Resend OTP"
+                  )}
                 </button>
               </div>
             )}

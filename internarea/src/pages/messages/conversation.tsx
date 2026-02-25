@@ -2,7 +2,8 @@ import axios from "axios";
 import { useEffect, useState, useRef, useCallback } from "react";
 import { useSelector } from "react-redux";
 import { useRouter } from "next/router";
-import { selectuser } from "@/Feature/Userslice";
+import { selectuser, selectLanguage } from "@/Feature/Userslice";
+import { useTranslation } from "@/utils/i18n";
 import { getApiEndpoint } from "@/utils/api";
 import { toast } from "react-toastify";
 import { Loader, ArrowLeft, Send, Check, CheckCheck } from "lucide-react";
@@ -11,6 +12,8 @@ export default function ConversationPage() {
   const router = useRouter();
   const { userId: otherUserId } = router.query;
   const user = useSelector(selectuser);
+  const language = useSelector(selectLanguage) || "en";
+  const { t } = useTranslation(language);
   const [messages, setMessages] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [messageText, setMessageText] = useState("");
@@ -71,7 +74,7 @@ export default function ConversationPage() {
       const response = await axios.get(getApiEndpoint(`/auth/user/${otherUserId}`));
       setOtherUser(response.data);
     } catch (error) {
-      setOtherUser({ name: "Unknown User" });
+      setOtherUser({ name: t('unknown_user') });
     }
   };
 
@@ -196,7 +199,7 @@ export default function ConversationPage() {
       <div className="min-h-screen bg-gray-100 flex items-center justify-center">
         <div className="bg-white rounded-lg shadow-md p-8 text-center">
           <Loader size={48} className="animate-spin mx-auto text-blue-600 mb-4" />
-          <p className="text-gray-600">Loading...</p>
+          <p className="text-gray-600">{t('loading')}</p>
         </div>
       </div>
     );
@@ -212,7 +215,7 @@ export default function ConversationPage() {
           </button>
           <div className="flex-1">
             <h1 className="text-xl font-semibold text-gray-900">
-              {otherUser?.name || "Loading..."}
+              {otherUser?.name || t('loading')}
             </h1>
             <p className="text-sm text-gray-500">
               {otherUser?.email || ""}
@@ -224,7 +227,7 @@ export default function ConversationPage() {
         {loading ? (
           <div className="bg-white rounded-lg shadow-md p-16 text-center">
             <Loader size={48} className="animate-spin mx-auto text-blue-600 mb-4" />
-            <p className="text-gray-600 text-lg">Loading conversation...</p>
+            <p className="text-gray-600 text-lg">{t('loading_conversation')}</p>
           </div>
         ) : (
           <div className="bg-white rounded-lg shadow-md flex flex-col h-[600px]">
@@ -235,7 +238,7 @@ export default function ConversationPage() {
             >
               {messages.length === 0 ? (
                 <div className="flex items-center justify-center h-full">
-                  <p className="text-gray-500 text-center">No messages yet. Say hello! 👋</p>
+                  <p className="text-gray-500 text-center">{t('no_messages_hello')}</p>
                 </div>
               ) : (
                 groupMessagesByDate().map((group: any, groupIdx: number) => (
@@ -273,9 +276,45 @@ export default function ConversationPage() {
                                 {msg.sharedBy.name}
                               </div>
                             )}
-                            {/* Message content */}
+                            {/* Shared Content Preview (Images/Caption) */}
+                            {msg.content && msg.content.postId !== "direct-message" && (
+                              <div className="mb-2 bg-black/5 rounded group overflow-hidden border border-black/5 hover:border-black/10 transition-colors">
+                                <a 
+                                  href={`${window.location.origin}/publicspace#post-${msg.content.postId}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="block"
+                                >
+                                  {msg.content.mediaUrls && msg.content.mediaUrls.length > 0 && (
+                                    <div className="relative aspect-video w-full overflow-hidden bg-gray-200">
+                                      <img 
+                                        src={msg.content.mediaUrls[0]} 
+                                        alt="Shared content" 
+                                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                                      />
+                                    </div>
+                                  )}
+                                  {msg.content.caption && (
+                                    <div className={`p-2 text-xs italic line-clamp-2 ${isOwn ? 'text-blue-50' : 'text-gray-600'}`}>
+                                      {msg.content.caption}
+                                    </div>
+                                  )}
+                                </a>
+                              </div>
+                            )}
+
+                            {/* Message content (with linkification) */}
                             <div className="text-sm break-words">
-                              {msg.sharedMessage || msg.content.caption}
+                              {(msg.sharedMessage || (msg.content?.caption && msg.content.postId === "direct-message") || "").split(/(\s+)/).map((part: string, i: number) => {
+                                if (part.startsWith("http://") || part.startsWith("https://")) {
+                                  return (
+                                    <a key={i} href={part} target="_blank" rel="noopener noreferrer" className="underline hover:text-blue-100 break-all">
+                                      {part}
+                                    </a>
+                                  );
+                                }
+                                return part;
+                              })}
                             </div>
                             {/* Timestamp and status */}
                             <div className={`text-xs mt-1 flex items-center gap-1 ${

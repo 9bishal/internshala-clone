@@ -12,7 +12,8 @@ import {
 import { useEffect, useState } from "react";
 import { useSelector } from "react-redux";
 import { toast } from "react-toastify";
-import { selectuser } from "@/Feature/Userslice";
+import { selectuser, selectLanguage } from "@/Feature/Userslice";
+import { useTranslation } from "@/utils/i18n";
 import { getApiEndpoint } from "@/utils/api";
 import { useRouter } from "next/router";
 import Link from "next/link";
@@ -20,6 +21,8 @@ import Link from "next/link";
 export default function MessageInbox() {
   const router = useRouter();
   const user = useSelector(selectuser);
+  const language = useSelector(selectLanguage) || "en";
+  const { t } = useTranslation(language);
   const [interactions, setInteractions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [offset, setOffset] = useState(0);
@@ -268,16 +271,16 @@ export default function MessageInbox() {
         <div className="max-w-2xl mx-auto px-4">
           <div className="bg-white rounded-lg shadow-md p-8 text-center">
             <h2 className="text-2xl font-bold text-gray-900 mb-4">
-              My Messages
+              {t('my_messages_title')}
             </h2>
             <p className="text-gray-600 text-lg mb-6">
-              Please log in to view your messages.
+              {t('please_login_messages')}
             </p>
             <button
               onClick={() => router.push("/")}
               className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
             >
-              Go to Home
+              {t('go_to_home')}
             </button>
           </div>
         </div>
@@ -296,18 +299,18 @@ export default function MessageInbox() {
           >
             <ArrowLeft size={24} className="text-gray-700" />
           </button>
-          <h1 className="text-3xl font-bold text-gray-900">My Messages</h1>
+          <h1 className="text-3xl font-bold text-gray-900">{t('my_messages_title')}</h1>
         </div>
 
         {/* Friends List */}
         <div className="mb-8">
-          <h2 className="text-lg font-semibold mb-2 text-gray-800">Friends</h2>
+          <h2 className="text-lg font-semibold mb-2 text-gray-800">{t('friends_title')}</h2>
           {loadingFriends ? (
             <div className="py-4 flex items-center justify-center">
               <Loader size={20} className="animate-spin text-blue-600" />
             </div>
           ) : friends.length === 0 ? (
-            <div className="text-gray-500 text-sm">No friends yet.</div>
+            <div className="text-gray-500 text-sm">{t('no_friends_yet')}</div>
           ) : (
             <div className="flex flex-wrap gap-2">
               {friends.map((friend) => (
@@ -333,236 +336,71 @@ export default function MessageInbox() {
         {loading ? (
           <div className="bg-white rounded-lg shadow-md p-16 text-center">
             <Loader size={48} className="animate-spin mx-auto text-blue-600 mb-4" />
-            <p className="text-gray-600 text-lg">Loading messages...</p>
+            <p className="text-gray-600 text-lg">{t('loading_messages')}</p>
           </div>
         ) : interactions.length === 0 ? (
           <div className="bg-white rounded-lg shadow-md p-8 text-center">
-            <p className="text-gray-600 text-lg">No messages yet</p>
+            <p className="text-gray-600 text-lg">{t('no_messages')}</p>
           </div>
         ) : (
           <>
-            {interactions.map((interaction) => {
-              const likeCount = interaction.interactions?.filter(
-                (i: any) => i.type === "like"
-              ).length || 0;
-              const commentCount = interaction.interactions?.filter(
-                (i: any) => i.type === "comment"
-              ).length || 0;
-              const isLiked = interaction.interactions?.some(
-                (i: any) => i.type === "like" && i.userId === user.uid
-              );
-              const isUnread = !interaction.isRead;
-
-              return (
-                <div
+            <div className="space-y-4">
+              <h2 className="text-lg font-semibold text-gray-800 px-1">{t('recent_messages')}</h2>
+              {interactions.reduce((acc: any[], curr: any) => {
+                if (!acc.find(item => item.sharedBy.userId === curr.sharedBy.userId)) {
+                  acc.push(curr);
+                }
+                return acc;
+              }, []).map((interaction: any) => (
+                <Link
                   key={interaction._id}
-                  className={`bg-white rounded-lg shadow-md p-6 mb-6 ${
-                    isUnread ? "border-l-4 border-blue-600" : ""
+                  href={{ pathname: "/messages/conversation", query: { userId: interaction.sharedBy.userId } }}
+                  className={`block bg-white rounded-xl shadow-sm border border-gray-100 p-4 hover:shadow-md transition-all ${
+                    !interaction.isRead ? "border-l-4 border-blue-600 bg-blue-50/30" : ""
                   }`}
                 >
-                  {/* Header */}
-                  <div className="flex items-start justify-between mb-4">
-                    <div className="flex items-center gap-3 flex-1">
-                      {interaction.sharedBy.photo ? (
-                        <img
-                          src={interaction.sharedBy.photo}
-                          alt={interaction.sharedBy.name}
-                          className="w-10 h-10 rounded-full object-cover"
-                        />
-                      ) : (
-                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold">
-                          {interaction.sharedBy.name?.charAt(0).toUpperCase() ||
-                            "U"}
-                        </div>
-                      )}
-                      <div className="flex-1">
-                        <p className="font-semibold text-gray-900">
-                          {interaction.sharedBy.name}
-                          {isUnread && (
-                            <span className="ml-2 text-xs bg-blue-600 text-white px-2 py-1 rounded">
-                              New
-                            </span>
-                          )}
-                        </p>
-                        <p className="text-sm text-gray-600">
-                          Shared: {formatDate(interaction.createdAt)}
-                        </p>
+                  <div className="flex items-center gap-4">
+                    {interaction.sharedBy.photo ? (
+                      <img
+                        src={interaction.sharedBy.photo}
+                        alt={interaction.sharedBy.name}
+                        className="w-12 h-12 rounded-full object-cover border border-gray-200"
+                      />
+                    ) : (
+                      <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold text-lg">
+                        {interaction.sharedBy.name?.charAt(0).toUpperCase() || "U"}
                       </div>
-                    </div>
-                    {isUnread && (
-                      <button
-                        onClick={() => markAsRead(interaction._id)}
-                        className="text-blue-600 hover:text-blue-700 ml-4"
-                      >
-                        <Check size={20} />
-                      </button>
                     )}
-                  </div>
 
-                  {/* Shared Message */}
-                  {interaction.sharedMessage && (
-                    <div className="bg-blue-50 rounded-lg p-4 mb-4 border-l-4 border-blue-400">
-                      <p className="text-gray-900 italic">
-                        "{interaction.sharedMessage}"
+                    <div className="flex-1 min-w-0">
+                      <div className="flex justify-between items-baseline mb-1">
+                        <h3 className="font-bold text-gray-900 truncate">
+                          {interaction.sharedBy.name}
+                        </h3>
+                        <span className="text-xs text-gray-500 flex-shrink-0">
+                          {formatDate(interaction.createdAt)}
+                        </span>
+                      </div>
+                      <p className={`text-sm truncate ${!interaction.isRead ? "text-gray-900 font-medium" : "text-gray-600"}`}>
+                        {interaction.sharedMessage || interaction.content.caption || t('sent_you_post')}
                       </p>
                     </div>
-                  )}
 
-                  {/* Content */}
-                  <div className="bg-gray-50 rounded-lg p-4 mb-4">
-                    {interaction.content.mediaUrls &&
-                      interaction.content.mediaUrls.length > 0 && (
-                        <div className="grid grid-cols-2 gap-2 mb-4">
-                          {interaction.content.mediaUrls.map((url: string, idx: number) => (
-                            <img
-                              key={idx}
-                              src={url}
-                              alt="Shared content"
-                              className="w-full h-32 object-cover rounded-lg"
-                            />
-                          ))}
-                        </div>
-                      )}
-                    {interaction.content.caption && (
-                      <p className="text-gray-900">{interaction.content.caption}</p>
+                    {!interaction.isRead && (
+                      <div className="w-3 h-3 bg-blue-600 rounded-full shadow-sm"></div>
                     )}
                   </div>
+                </Link>
+              ))}
+            </div>
 
-                  {/* Interaction Stats */}
-                  <div className="flex gap-4 text-sm text-gray-600 mb-4">
-                    <button className="hover:text-gray-900 transition">
-                      {likeCount} {likeCount === 1 ? "like" : "likes"}
-                    </button>
-                    <span>
-                      {commentCount} {commentCount === 1 ? "comment" : "comments"}
-                    </span>
-                  </div>
-
-                  {/* Actions */}
-                  <div className="flex gap-2 mb-4 pb-4 border-b">
-                    <button
-                      onClick={() => handleLikeContent(interaction._id)}
-                      disabled={loadingActions[`like-${interaction._id}`]}
-                      className={`flex items-center gap-2 px-4 py-2 rounded-lg transition font-medium flex-1 ${
-                        loadingActions[`like-${interaction._id}`]
-                          ? "opacity-60 cursor-not-allowed"
-                          : isLiked
-                          ? "text-red-500 bg-red-50 hover:bg-red-100"
-                          : "text-gray-700 hover:bg-gray-100"
-                      }`}
-                    >
-                      {loadingActions[`like-${interaction._id}`] ? (
-                        <Loader size={18} className="animate-spin" />
-                      ) : (
-                        <Heart
-                          size={18}
-                          fill={isLiked ? "currentColor" : "none"}
-                        />
-                      )}
-                      {isLiked ? "Liked" : "Like"}
-                    </button>
-                    <button
-                      onClick={() => handleDelete(interaction._id)}
-                      disabled={loadingActions[`delete-${interaction._id}`]}
-                      className="flex items-center gap-2 px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg transition font-medium"
-                    >
-                      {loadingActions[`delete-${interaction._id}`] ? (
-                        <Loader size={18} className="animate-spin" />
-                      ) : (
-                        <Trash2 size={18} />
-                      )}
-                    </button>
-                  </div>
-
-                  {/* Comment Section */}
-                  <div className="space-y-3">
-                    {/* Existing Comments */}
-                    {interaction.interactions?.length > 0 && (
-                      <div className="space-y-3 mb-4">
-                        {interaction.interactions
-                          .filter((int: any) => int.type === "comment")
-                          .map((comment: any, idx: number) => (
-                            <div key={idx} className="flex items-start gap-2">
-                              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-green-500 to-teal-600 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
-                                {comment.userId?.charAt(0).toUpperCase() || "U"}
-                              </div>
-                              <div className="flex-1 bg-gray-50 rounded-lg p-3">
-                                <p className="text-sm text-gray-900">
-                                  {comment.value}
-                                </p>
-                                <p className="text-xs text-gray-500 mt-1">
-                                  {formatDate(comment.createdAt)}
-                                </p>
-                              </div>
-                            </div>
-                          ))}
-                      </div>
-                    )}
-
-                    {/* Comment Input */}
-                    <div className="flex gap-2">
-                      {user?.photo ? (
-                        <img
-                          src={user.photo}
-                          alt={user.name || "User"}
-                          className="w-8 h-8 rounded-full object-cover flex-shrink-0"
-                        />
-                      ) : (
-                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
-                          {user.name?.charAt(0).toUpperCase() || "U"}
-                        </div>
-                      )}
-                      <input
-                        type="text"
-                        value={commentText[interaction._id] || ""}
-                        onChange={(e) =>
-                          setCommentText({
-                            ...commentText,
-                            [interaction._id]: e.target.value,
-                          })
-                        }
-                        onKeyPress={(e) => {
-                          if (e.key === "Enter" && !e.shiftKey) {
-                            e.preventDefault();
-                            handleComment(interaction._id);
-                          }
-                        }}
-                        placeholder="Write a response..."
-                        className="flex-1 p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 text-sm"
-                      />
-                      <button
-                        onClick={() => handleComment(interaction._id)}
-                        disabled={
-                          !commentText[interaction._id]?.trim() ||
-                          loadingActions[`comment-${interaction._id}`]
-                        }
-                        className={`px-3 py-2 rounded-lg transition font-medium flex items-center gap-2 ${
-                          !commentText[interaction._id]?.trim() ||
-                          loadingActions[`comment-${interaction._id}`]
-                            ? "bg-gray-400 cursor-not-allowed opacity-60"
-                            : "bg-blue-600 text-white hover:bg-blue-700"
-                        }`}
-                      >
-                        {loadingActions[`comment-${interaction._id}`] ? (
-                          <Loader size={16} className="animate-spin" />
-                        ) : (
-                          <Send size={16} />
-                        )}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-
-            {/* Load More Button */}
             {hasMore && (
-              <div className="text-center">
+              <div className="text-center mt-8">
                 <button
                   onClick={() => fetchInbox(offset)}
-                  className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium"
+                  className="px-6 py-2 bg-white border border-gray-300 text-gray-700 rounded-full hover:bg-gray-50 transition font-medium shadow-sm"
                 >
-                  Load More
+                  {t('load_more')}
                 </button>
               </div>
             )}
