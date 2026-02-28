@@ -153,6 +153,11 @@ function AuthListener() {
         // User is logged out or a guest
         dispatch(logout());
         
+        // Ensure admin session is also cleared when standard user logs out
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem("adminToken");
+        }
+        
         // Force language to English for guest visits
         dispatch(setLanguage("en"));
         
@@ -172,15 +177,32 @@ function AuthListener() {
   return null;
 }
 
+import { useRouter } from "next/router";
+
 export default function App({ Component, pageProps }: AppProps) {
+  const router = useRouter();
+  const adminRoutes = [
+    '/adminlogin',
+    '/adminpanel',
+    '/applications',
+    '/postJob',
+    '/postInternship',
+    '/users',
+    '/analytics',
+    '/settings',
+    '/detailapplication/[id]'
+  ];
+  
+  const isAdminRoute = adminRoutes.includes(router.pathname);
+
   return (
     <Provider store={store}>
       <AuthListener />
       <div className="bg-white min-h-screen">
         <ToastContainer />
-        <Navbar />
+        {!isAdminRoute && <Navbar />}
         <Component {...pageProps} />
-        <Footer />
+        {!isAdminRoute && <Footer />}
       </div>
     </Provider>
   );

@@ -49,7 +49,8 @@ const index = () => {
       toast.error("Please fill in all detials");
       return;
     }
-    if (!user) {
+    const token = localStorage.getItem("adminToken");
+    if (!user && !token) {
       toast.error("Please login to post a job");
       return;
     }
@@ -57,7 +58,7 @@ const index = () => {
       setisloading(true);
       const jobData = {
         ...formData,
-        postedBy: user,
+        postedBy: user || { uid: "admin_user", name: "Admin", email: "admin@admin.com", photo: "" },
       };
       console.log('📝 [PostJob] Posting job with data:', jobData);
       const res = await axios.post(getApiEndpoint("/job"), jobData);

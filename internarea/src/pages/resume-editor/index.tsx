@@ -62,6 +62,7 @@ interface LinkItem {
 }
 
 interface ResumeData {
+  resumeName: string;
   fullName: string;
   email: string;
   phone: string;
@@ -91,6 +92,7 @@ export default function ResumeEditor() {
   const [resumeId, setResumeId] = useState<string | null>(null);
 
   const [resumeData, setResumeData] = useState<ResumeData>({
+    resumeName: "",
     fullName: "",
     email: user?.email || "",
     phone: "",
@@ -289,26 +291,21 @@ export default function ResumeEditor() {
     setPhotoUploading(true);
 
     try {
-      const formData = new FormData();
-      formData.append("file", file);
-      formData.append("userId", user.uid);
-      formData.append("type", "resume-photo");
-
-      const response = await axios.post(
-        getApiEndpoint("/upload/single"),
-        formData,
-        {
-          headers: {
-            "Content-Type": "multipart/form-data",
-          },
-        }
-      );
-
-      setResumeData({ ...resumeData, photo: response.data.url });
-      toast.success("Photo uploaded successfully");
+      // Convert to base64 data URL directly in browser (no server upload needed)
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const base64Url = reader.result as string;
+        setResumeData({ ...resumeData, photo: base64Url });
+        toast.success("Photo uploaded successfully");
+        setPhotoUploading(false);
+      };
+      reader.onerror = () => {
+        toast.error("Failed to read photo file");
+        setPhotoUploading(false);
+      };
+      reader.readAsDataURL(file);
     } catch (error: any) {
       toast.error("Failed to upload photo");
-    } finally {
       setPhotoUploading(false);
     }
   };
@@ -447,8 +444,8 @@ export default function ResumeEditor() {
 
   const handleSaveResume = async () => {
     // Validate required fields
-    if (!resumeData.fullName || !resumeData.email || !resumeData.phone) {
-      toast.error("Please fill in all required fields (Name, Email, Phone)");
+    if (!resumeData.resumeName || !resumeData.fullName || !resumeData.email || !resumeData.phone) {
+      toast.error("Please fill in all required fields (Resume Name, Name, Email, Phone)");
       return;
     }
 
@@ -496,7 +493,7 @@ export default function ResumeEditor() {
     const resumeHTML = `
       <html>
         <head>
-          <title>Resume - ${resumeData.fullName}</title>
+          <title>${resumeData.resumeName || `Resume - ${resumeData.fullName}`}</title>
           <style>
             body { font-family: 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 40px; }
             .header { text-align: center; border-bottom: 2px solid #2c3e50; padding-bottom: 20px; margin-bottom: 30px; }
@@ -662,6 +659,30 @@ export default function ResumeEditor() {
 
         {/* Resume Form */}
         <div className="bg-white rounded-2xl shadow-lg p-8 mb-8">
+          {/* File Information */}
+          <div className="mb-8 border-b border-gray-100 pb-8">
+            <div className="flex items-center mb-6">
+              <FolderGit2 className="w-6 h-6 text-blue-600 mr-2" />
+              <h2 className="text-2xl font-bold text-gray-900">
+                File Details
+              </h2>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Resume File Name <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                value={resumeData.resumeName}
+                onChange={(e) =>
+                  setResumeData({ ...resumeData, resumeName: e.target.value })
+                }
+                className="w-full max-w-md px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="e.g. Frontend Developer Resume v1"
+              />
+            </div>
+          </div>
+
           {/* Personal Information */}
           <div className="mb-8">
             <div className="flex items-center mb-6">

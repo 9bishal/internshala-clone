@@ -72,6 +72,7 @@ const Navbar = () => {
 
   const handlelogout = () => {
     signOut(auth);
+    localStorage.removeItem("adminToken");
     setShowUserMenu(false);
   };
 

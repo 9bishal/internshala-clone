@@ -95,12 +95,6 @@ const index = () => {
   }, []);
   // console.log(data);
   const filteredapplications = data.filter((application: any) => {
-    // Only show applications for jobs/internships posted by the current user
-    const posting = jobsAndInternships[application.Application];
-    if (!posting || !currentUser || !posting.postedBy || posting.postedBy.uid !== currentUser.uid) {
-      return false;
-    }
-    
     const searchmatch =
       application.company.toLowerCase().includes(searchTerm.toLowerCase()) ||
       application.category.toLowerCase().includes(searchTerm.toLowerCase()) ||

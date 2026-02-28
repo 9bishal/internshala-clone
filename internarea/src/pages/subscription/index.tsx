@@ -17,6 +17,7 @@ import {
   CheckCircle,
 } from "lucide-react";
 import { toast } from "react-toastify";
+import { useTranslation } from "@/utils/i18n";
 
 // Declare Razorpay on window
 declare global {
@@ -45,6 +46,7 @@ export default function SubscriptionPlans() {
   const router = useRouter();
   const user = useSelector(selectuser);
   const language = useSelector(selectLanguage) || "en";
+  const { t } = useTranslation(language);
   const [plans, setPlans] = useState<Plan[]>([]);
   const [subscription, setSubscription] = useState<UserSubscription | null>(null);
   const [loading, setLoading] = useState(true);
@@ -326,19 +328,19 @@ export default function SubscriptionPlans() {
           <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
             <CheckCircle className="w-10 h-10 text-green-600" />
           </div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-3">Payment Successful!</h1>
+          <h1 className="text-3xl font-bold text-gray-900 mb-3">{t("payment_successful")}</h1>
           <p className="text-gray-600 mb-2">
-            You are now subscribed to the <span className="font-bold text-indigo-600">{successPlan}</span>.
+            {t("now_subscribed")} <span className="font-bold text-indigo-600">{successPlan}</span>.
           </p>
           <p className="text-sm text-gray-500 mb-8">
-            📧 An invoice has been sent to your registered email address.
+            {t("invoice_sent")}
           </p>
           <div className="space-y-3">
             <button
               onClick={() => { setPaymentSuccess(false); fetchPlansAndSubscription(); }}
               className="w-full py-3 bg-indigo-600 text-white rounded-lg font-semibold hover:bg-indigo-700 transition"
             >
-              View Subscription
+              {t("view_subscription")}
             </button>
             <button
               onClick={() => router.push("/internship")}
@@ -362,12 +364,12 @@ export default function SubscriptionPlans() {
             className="flex items-center text-gray-600 hover:text-gray-900 mb-6 transition-colors"
           >
             <ArrowLeft className="w-5 h-5 mr-2" />
-            Back
+            {t("back")}
           </button>
 
-          <h1 className="text-4xl font-bold text-gray-900 mb-4">Choose Your Plan</h1>
+          <h1 className="text-4xl font-bold text-gray-900 mb-4">{t("choose_your_plan")}</h1>
           <p className="text-xl text-gray-600">
-            Select the perfect plan for your career growth
+            {t("select_perfect_plan")}
           </p>
         </div>
 
@@ -408,17 +410,17 @@ export default function SubscriptionPlans() {
           <div className="mb-8 bg-blue-50 border border-blue-200 rounded-lg p-6">
             <div className="flex items-start justify-between">
               <div>
-                <h3 className="font-semibold text-gray-900">Current Plan</h3>
+                <h3 className="font-semibold text-gray-900">{t("current_plan")}</h3>
                 <p className="text-gray-600 mt-2">
-                  You are currently on the{" "}
+                  {t("you_are_currently_on")}{" "}
                   <span className="font-bold text-blue-600">
-                    {subscription.planDetails?.name}
+                    {t(subscription.planDetails?.name || "")}
                   </span>{" "}
-                  plan
+                  {t("plan_word")}
                 </p>
                 {subscription.expiresAt && (
                   <p className="text-sm text-gray-600 mt-1">
-                    Expires on: <span className="font-semibold">{formatExpiryDate(subscription.expiresAt)}</span>
+                    {t("expires_on")}: <span className="font-semibold">{formatExpiryDate(subscription.expiresAt)}</span>
                   </p>
                 )}
               </div>
@@ -429,8 +431,8 @@ export default function SubscriptionPlans() {
                   className="text-red-600 hover:text-red-700 font-medium text-sm disabled:opacity-50 flex items-center gap-1"
                 >
                   {subscribing === "cancel" ? (
-                    <><Loader className="w-4 h-4 animate-spin" /> Cancelling...</>
-                  ) : "Cancel Plan"}
+                    <><Loader className="w-4 h-4 animate-spin" /> {t("cancelling")}</>
+                  ) : t("cancel_plan")}
                 </button>
               )}
             </div>
@@ -441,18 +443,18 @@ export default function SubscriptionPlans() {
         {(loading && !authChecked) || (loading && user) ? (
           <div className="text-center py-16">
             <Loader className="w-8 h-8 text-gray-400 animate-spin mx-auto mb-4" />
-            <p className="text-gray-600">Loading plans...</p>
+            <p className="text-gray-600">{t("loading_plans")}</p>
           </div>
         ) : !user ? (
           <div className="text-center py-16">
             <Shield className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">Sign in to view plans</h2>
-            <p className="text-gray-600 mb-6">Please log in to view and subscribe to our premium plans.</p>
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">{t("sign_in_plans")}</h2>
+            <p className="text-gray-600 mb-6">{t("login_premium_desc")}</p>
             <button
               onClick={() => router.push("/")}
               className="bg-gradient-to-r from-indigo-600 to-blue-600 text-white px-8 py-3 rounded-lg font-semibold hover:shadow-lg transition-all"
             >
-              Go to Login
+              {t("go_to_login")}
             </button>
           </div>
         ) : (
@@ -472,7 +474,7 @@ export default function SubscriptionPlans() {
                 >
                   {isPopular && (
                     <div className="absolute top-0 right-0 bg-gradient-to-r from-purple-600 to-pink-600 text-white px-3 py-1 text-xs font-semibold rounded-bl-lg z-10">
-                      Most Popular
+                      {t("most_popular")}
                     </div>
                   )}
 
@@ -481,9 +483,9 @@ export default function SubscriptionPlans() {
                     <div className={`bg-gradient-to-r ${gradient} px-6 py-6 text-white`}>
                       <div className="flex items-start justify-between mb-3">
                         <div>
-                          <h3 className="text-xl font-bold">{plan.name}</h3>
+                          <h3 className="text-xl font-bold">{t(plan.name)}</h3>
                           {plan.duration && (
-                            <p className="text-xs opacity-80 mt-0.5">{plan.duration} days</p>
+                            <p className="text-xs opacity-80 mt-0.5">{plan.duration} {t("days")}</p>
                           )}
                         </div>
                         <div className="bg-white bg-opacity-20 rounded-full p-2">
@@ -494,10 +496,10 @@ export default function SubscriptionPlans() {
                       <div className="flex items-baseline gap-1">
                         <span className="text-3xl font-bold">₹{plan.price}</span>
                         {plan.price > 0 && (
-                          <span className="text-sm opacity-80">/month</span>
+                          <span className="text-sm opacity-80">{t("per_month")}</span>
                         )}
                         {plan.price === 0 && (
-                          <span className="text-sm opacity-80">Free forever</span>
+                          <span className="text-sm opacity-80">{t("free_forever")}</span>
                         )}
                       </div>
                     </div>
@@ -508,7 +510,7 @@ export default function SubscriptionPlans() {
                         {plan.features.map((feature, idx) => (
                           <li key={idx} className="flex items-start gap-2 text-sm text-gray-700">
                             <Check className="w-4 h-4 text-green-500 flex-shrink-0 mt-0.5" />
-                            <span>{feature}</span>
+                            <span>{t(feature)}</span>
                           </li>
                         ))}
                       </ul>
@@ -518,14 +520,14 @@ export default function SubscriptionPlans() {
                     <div className="px-5 py-5 border-t border-gray-100">
                       {isCurrentPlan ? (
                         <div className="w-full py-3 bg-green-50 border border-green-200 text-green-700 rounded-lg font-semibold text-center text-sm">
-                          ✓ Current Plan
+                          {t("current_plan_check")}
                         </div>
                       ) : plan.price === 0 ? (
                         <button
                           onClick={() => router.push("/internship")}
                           className="w-full py-3 rounded-lg font-semibold text-sm bg-gray-100 text-gray-800 hover:bg-gray-200 transition"
                         >
-                          Browse Internships
+                          {t("browse_internships")}
                         </button>
                       ) : (
                         <button
@@ -540,12 +542,12 @@ export default function SubscriptionPlans() {
                           {subscribing === plan.id ? (
                             <>
                               <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full" />
-                              <span>Processing...</span>
+                              <span>{t("processing")}</span>
                             </>
                           ) : (
                             <>
                               <CreditCard className="w-4 h-4" />
-                              <span>Subscribe — ₹{plan.price}</span>
+                              <span>{t("subscribe_btn")}{plan.price}</span>
                             </>
                           )}
                         </button>
@@ -566,34 +568,33 @@ export default function SubscriptionPlans() {
                 <rect width="24" height="24" rx="4" fill="#072654" />
                 <path d="M7 17L12 7L17 17" stroke="#3395FF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
-              Secured by Razorpay • Test mode — use card 4111 1111 1111 1111 / any future date / any CVV
+              {t("secured_by_razorpay")}
             </p>
           </div>
         )}
 
-        {/* FAQ Section */}
         <div className="mt-16">
           <h2 className="text-3xl font-bold text-gray-900 mb-8">
-            Frequently Asked Questions
+            {t("faq")}
           </h2>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {[
               {
-                q: "When can I make payments?",
-                a: "Payments are only accepted between 10:00 AM and 11:00 AM IST as per platform policy.",
+                q: t("when_payments"),
+                a: t("when_payments_ans"),
               },
               {
-                q: "What payment methods do you accept?",
-                a: "We accept all major credit/debit cards, UPI, net banking, and digital wallets through Razorpay.",
+                q: t("what_methods"),
+                a: t("what_methods_ans"),
               },
               {
-                q: "Will I receive an invoice?",
-                a: "Yes! After successful payment, a detailed invoice is automatically sent to your registered email address.",
+                q: t("will_invoice"),
+                a: t("will_invoice_ans"),
               },
               {
-                q: "What if my payment fails?",
-                a: "If payment fails, no amount is deducted. You'll receive an email notification explaining what happened and how to retry.",
+                q: t("what_if_fails"),
+                a: t("what_if_fails_ans"),
               },
             ].map((item, idx) => (
               <div key={idx} className="bg-white rounded-lg shadow-md p-6">

@@ -1,6 +1,6 @@
 import { selectuser, selectLanguage } from "@/Feature/Userslice";
 import { useTranslation } from "@/utils/i18n";
-import { ExternalLink, Mail, User } from "lucide-react";
+import { ExternalLink, Mail, User, Edit2, Save, X } from "lucide-react";
 import Link from "next/link";
 import React, { useState, useEffect } from "react";
 import { useSelector } from "react-redux";
@@ -22,6 +22,8 @@ const index = () => {
   const [resumes, setResumes] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [defaultResumeId, setDefaultResumeId] = useState<string | null>(null);
+  const [editingResumeId, setEditingResumeId] = useState<string | null>(null);
+  const [editResumeName, setEditResumeName] = useState("");
 
   useEffect(() => {
     if (!user) {
@@ -64,7 +66,7 @@ const index = () => {
     const resumeHTML = `
       <html>
         <head>
-          <title>Resume - ${resumeData.fullName}</title>
+          <title>${resumeData.resumeName || `Resume - ${resumeData.fullName}`}</title>
           <style>
             body { font-family: 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 40px; }
             .header { text-align: center; border-bottom: 2px solid #2c3e50; padding-bottom: 20px; margin-bottom: 30px; }
@@ -211,6 +213,24 @@ const index = () => {
     }
   };
 
+  const handleSaveResumeName = async (resumeId: string) => {
+    try {
+      if (!editResumeName.trim()) {
+        toast.error("Resume name cannot be empty");
+        return;
+      }
+      await axios.put(getApiEndpoint(`/resume/rename-resume/${user.uid}/${resumeId}`), {
+        resumeName: editResumeName
+      });
+      toast.success("Resume renamed successfully");
+      setResumes(resumes.map(r => r.id === resumeId ? { ...r, resumeName: editResumeName } : r));
+      setEditingResumeId(null);
+    } catch (error) {
+      toast.error("Failed to rename resume");
+      console.error(error);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 py-12">
       <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -292,14 +312,43 @@ const index = () => {
                   {resumes.map((resume) => (
                     <div key={resume.id} className="border border-gray-200 rounded-lg p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                       <div>
-                        <h3 className="font-semibold text-gray-900 flex items-center gap-2">
-                          {resume.fullName || "Resume"}
-                          {defaultResumeId === resume.id && (
-                            <span className="bg-green-100 text-green-700 text-xs px-2 py-0.5 rounded-full font-medium">
-                              Default
-                            </span>
+                        <div className="flex items-center gap-2 mb-1">
+                          {editingResumeId === resume.id ? (
+                            <div className="flex items-center gap-2">
+                              <input
+                                autoFocus
+                                type="text"
+                                value={editResumeName}
+                                onChange={(e) => setEditResumeName(e.target.value)}
+                                className="px-2 py-1 border border-gray-300 rounded text-sm focus:ring-1 focus:ring-blue-500"
+                              />
+                              <button onClick={() => handleSaveResumeName(resume.id)} className="text-green-600 hover:text-green-700">
+                                <Save className="h-4 w-4" />
+                              </button>
+                              <button onClick={() => setEditingResumeId(null)} className="text-gray-500 hover:text-gray-700">
+                                <X className="h-4 w-4" />
+                              </button>
+                            </div>
+                          ) : (
+                            <h3 className="font-semibold text-gray-900 flex items-center gap-2">
+                              {resume.resumeName || resume.fullName || "Resume"}
+                              <button
+                                onClick={() => {
+                                  setEditingResumeId(resume.id);
+                                  setEditResumeName(resume.resumeName || resume.fullName || "Resume");
+                                }}
+                                className="text-gray-400 hover:text-blue-600 transition-colors"
+                              >
+                                <Edit2 className="h-4 w-4" />
+                              </button>
+                              {defaultResumeId === resume.id && (
+                                <span className="bg-green-100 text-green-700 text-xs px-2 py-0.5 rounded-full font-medium">
+                                  Default
+                                </span>
+                              )}
+                            </h3>
                           )}
-                        </h3>
+                        </div>
                         <p className="text-sm text-gray-500">
                           Created at: {new Date(resume.createdAt?._seconds * 1000 || resume.createdAt).toLocaleDateString()}
                         </p>

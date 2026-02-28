@@ -50,6 +50,132 @@ async function sendOTPEmail(email, otp, name) {
   await sgMail.send(msg);
 }
 
+// Send payment success email
+async function sendPaymentSuccessEmail(email, name, paymentDetails) {
+  const msg = {
+    to: email,
+    from: process.env.DEFAULT_FROM_EMAIL,
+    subject: "Payment Successful - Resume Builder | Internshala",
+    html: `
+      <div style="font-family: Arial, sans-serif; background-color: #f4f4f4; padding: 20px;">
+        <div style="background-color: white; padding: 30px; border-radius: 8px; max-width: 600px; margin: 0 auto;">
+          <div style="text-align: center; margin-bottom: 20px;">
+            <div style="background-color: #10B981; width: 60px; height: 60px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center;">
+              <span style="color: white; font-size: 28px;">✓</span>
+            </div>
+          </div>
+          <h2 style="color: #10B981; text-align: center; margin-bottom: 20px;">Payment Successful!</h2>
+          <p style="color: #666; font-size: 16px; margin-bottom: 20px;">
+            Hi ${name},<br><br>
+            Your payment for Resume Creation has been successfully processed. You can now create your professional resume.
+          </p>
+          <div style="background-color: #f9fafb; padding: 20px; border-radius: 8px; margin: 20px 0; border: 1px solid #e5e7eb;">
+            <h3 style="color: #333; margin: 0 0 15px 0; font-size: 16px;">Payment Receipt</h3>
+            <table style="width: 100%; border-collapse: collapse;">
+              <tr>
+                <td style="padding: 8px 0; color: #666; font-size: 14px;">Amount Paid</td>
+                <td style="padding: 8px 0; color: #333; font-size: 14px; text-align: right; font-weight: bold;">₹${paymentDetails.amount}</td>
+              </tr>
+              <tr>
+                <td style="padding: 8px 0; color: #666; font-size: 14px;">Payment ID</td>
+                <td style="padding: 8px 0; color: #333; font-size: 14px; text-align: right;">${paymentDetails.razorpay_payment_id}</td>
+              </tr>
+              <tr>
+                <td style="padding: 8px 0; color: #666; font-size: 14px;">Order ID</td>
+                <td style="padding: 8px 0; color: #333; font-size: 14px; text-align: right;">${paymentDetails.razorpay_order_id}</td>
+              </tr>
+              <tr>
+                <td style="padding: 8px 0; color: #666; font-size: 14px;">Date</td>
+                <td style="padding: 8px 0; color: #333; font-size: 14px; text-align: right;">${new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })}</td>
+              </tr>
+              <tr>
+                <td style="padding: 8px 0; color: #666; font-size: 14px;">Status</td>
+                <td style="padding: 8px 0; color: #10B981; font-size: 14px; text-align: right; font-weight: bold;">✅ Completed</td>
+              </tr>
+            </table>
+          </div>
+          <div style="text-align: center; margin-top: 25px;">
+            <a href="${process.env.SITE_URL || "http://localhost:3000"}/resume-editor" style="background-color: #3B82F6; color: white; padding: 12px 30px; border-radius: 6px; text-decoration: none; font-size: 16px; display: inline-block;">
+              Create Your Resume Now
+            </a>
+          </div>
+          <p style="color: #999; font-size: 12px; text-align: center; margin-top: 25px;">
+            If you have any questions, please contact our support team.
+          </p>
+        </div>
+      </div>
+    `,
+  };
+
+  try {
+    await sgMail.send(msg);
+    console.log("Payment success email sent to:", email);
+  } catch (error) {
+    console.error("Failed to send payment success email:", error);
+  }
+}
+
+// Send payment failed email
+async function sendPaymentFailedEmail(email, name, failureDetails) {
+  const msg = {
+    to: email,
+    from: process.env.DEFAULT_FROM_EMAIL,
+    subject: "Payment Failed - Resume Builder | Internshala",
+    html: `
+      <div style="font-family: Arial, sans-serif; background-color: #f4f4f4; padding: 20px;">
+        <div style="background-color: white; padding: 30px; border-radius: 8px; max-width: 600px; margin: 0 auto;">
+          <div style="text-align: center; margin-bottom: 20px;">
+            <div style="background-color: #EF4444; width: 60px; height: 60px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center;">
+              <span style="color: white; font-size: 28px;">✗</span>
+            </div>
+          </div>
+          <h2 style="color: #EF4444; text-align: center; margin-bottom: 20px;">Payment Failed</h2>
+          <p style="color: #666; font-size: 16px; margin-bottom: 20px;">
+            Hi ${name},<br><br>
+            Unfortunately, your payment for Resume Creation could not be processed. Don't worry — no amount has been deducted from your account.
+          </p>
+          <div style="background-color: #fef2f2; padding: 20px; border-radius: 8px; margin: 20px 0; border: 1px solid #fecaca;">
+            <h3 style="color: #333; margin: 0 0 15px 0; font-size: 16px;">Failure Details</h3>
+            <table style="width: 100%; border-collapse: collapse;">
+              <tr>
+                <td style="padding: 8px 0; color: #666; font-size: 14px;">Amount</td>
+                <td style="padding: 8px 0; color: #333; font-size: 14px; text-align: right;">₹${RESUME_PRICE}</td>
+              </tr>
+              <tr>
+                <td style="padding: 8px 0; color: #666; font-size: 14px;">Reason</td>
+                <td style="padding: 8px 0; color: #EF4444; font-size: 14px; text-align: right;">${failureDetails.reason || "Payment was declined or cancelled"}</td>
+              </tr>
+              <tr>
+                <td style="padding: 8px 0; color: #666; font-size: 14px;">Date</td>
+                <td style="padding: 8px 0; color: #333; font-size: 14px; text-align: right;">${new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })}</td>
+              </tr>
+              <tr>
+                <td style="padding: 8px 0; color: #666; font-size: 14px;">Status</td>
+                <td style="padding: 8px 0; color: #EF4444; font-size: 14px; text-align: right; font-weight: bold;">❌ Failed</td>
+              </tr>
+            </table>
+          </div>
+          <div style="text-align: center; margin-top: 25px;">
+            <a href="${process.env.SITE_URL || "http://localhost:3000"}/resume/create" style="background-color: #3B82F6; color: white; padding: 12px 30px; border-radius: 6px; text-decoration: none; font-size: 16px; display: inline-block;">
+              Try Again
+            </a>
+          </div>
+          <p style="color: #999; font-size: 12px; text-align: center; margin-top: 25px;">
+            If the amount was deducted, it will be refunded within 5-7 business days. For help, contact our support team.
+          </p>
+        </div>
+      </div>
+    `,
+  };
+
+  try {
+    await sgMail.send(msg);
+    console.log("Payment failed email sent to:", email);
+  } catch (error) {
+    console.error("Failed to send payment failed email:", error);
+  }
+}
+
 // Request OTP for resume creation
 router.post("/request-otp", async (req, res) => {
   try {
@@ -75,15 +201,12 @@ router.post("/request-otp", async (req, res) => {
     const otpExpiry = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
 
     // Store OTP in database
-    await db
-      .collection("resume_otps")
-      .doc(uid)
-      .set({
-        otp,
-        expiresAt: otpExpiry,
-        createdAt: new Date(),
-        verified: false,
-      });
+    await db.collection("resume_otps").doc(uid).set({
+      otp,
+      expiresAt: otpExpiry,
+      createdAt: new Date(),
+      verified: false,
+    });
 
     // Send OTP email
     await sendOTPEmail(userData.email, otp, userData.name || "User");
@@ -111,7 +234,9 @@ router.post("/verify-otp", async (req, res) => {
     const otpDoc = await db.collection("resume_otps").doc(uid).get();
 
     if (!otpDoc.exists) {
-      return res.status(400).json({ message: "No OTP found. Please request a new one." });
+      return res
+        .status(400)
+        .json({ message: "No OTP found. Please request a new one." });
     }
 
     const otpData = otpDoc.data();
@@ -119,12 +244,16 @@ router.post("/verify-otp", async (req, res) => {
     // Check if OTP has expired
     if (new Date() > otpData.expiresAt.toDate()) {
       await db.collection("resume_otps").doc(uid).delete();
-      return res.status(400).json({ message: "OTP has expired. Please request a new one." });
+      return res
+        .status(400)
+        .json({ message: "OTP has expired. Please request a new one." });
     }
 
     // Verify OTP
     if (otpData.otp !== otp) {
-      return res.status(400).json({ message: "Invalid OTP. Please try again." });
+      return res
+        .status(400)
+        .json({ message: "Invalid OTP. Please try again." });
     }
 
     // Mark as verified
@@ -192,12 +321,8 @@ router.post("/create-resume-order", async (req, res) => {
 router.post("/verify-resume-payment", async (req, res) => {
   try {
     db = admin.firestore();
-    const {
-      uid,
-      razorpay_order_id,
-      razorpay_payment_id,
-      razorpay_signature,
-    } = req.body;
+    const { uid, razorpay_order_id, razorpay_payment_id, razorpay_signature } =
+      req.body;
 
     if (
       !uid ||
@@ -244,6 +369,19 @@ router.post("/verify-resume-payment", async (req, res) => {
     // Clean up OTP
     await db.collection("resume_otps").doc(uid).delete();
 
+    // Send payment success email
+    if (userData && userData.email) {
+      await sendPaymentSuccessEmail(
+        userData.email,
+        userData.name || userData.displayName || "User",
+        {
+          amount: RESUME_PRICE,
+          razorpay_payment_id,
+          razorpay_order_id,
+        },
+      );
+    }
+
     res.status(200).json({
       message: "Payment verified successfully. Resume creation unlocked!",
       payment: paymentRecord,
@@ -255,6 +393,47 @@ router.post("/verify-resume-payment", async (req, res) => {
   }
 });
 
+// Handle payment failure notification
+router.post("/payment-failed", async (req, res) => {
+  try {
+    db = admin.firestore();
+    const { uid, razorpay_order_id, reason } = req.body;
+
+    if (!uid) {
+      return res.status(400).json({ message: "User ID is required" });
+    }
+
+    const userDoc = await db.collection("users").doc(uid).get();
+    const userData = userDoc.exists ? userDoc.data() : null;
+
+    // Record the failed payment
+    await db.collection("payments").add({
+      uid,
+      type: "resume_creation",
+      amount: RESUME_PRICE,
+      currency: "INR",
+      razorpay_order_id: razorpay_order_id || null,
+      status: "failed",
+      reason: reason || "Payment was declined or cancelled",
+      timestamp: new Date(),
+    });
+
+    // Send payment failed email
+    if (userData && userData.email) {
+      await sendPaymentFailedEmail(
+        userData.email,
+        userData.name || userData.displayName || "User",
+        { reason: reason || "Payment was declined or cancelled" },
+      );
+    }
+
+    res.status(200).json({ message: "Payment failure recorded" });
+  } catch (error) {
+    console.error("Error handling payment failure:", error);
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+});
+
 // Save resume data
 router.post("/save-resume", async (req, res) => {
   try {
@@ -262,7 +441,9 @@ router.post("/save-resume", async (req, res) => {
     const { uid, resumeData } = req.body;
 
     if (!uid || !resumeData) {
-      return res.status(400).json({ message: "UID and resume data are required" });
+      return res
+        .status(400)
+        .json({ message: "UID and resume data are required" });
     }
 
     const resume = {
@@ -276,26 +457,25 @@ router.post("/save-resume", async (req, res) => {
 
     const userDoc = await db.collection("users").doc(uid).get();
     const userData = userDoc.data() || {};
-    
+
     const subscription = userData.subscription || {};
-    const hasPremium = ["bronze", "silver", "gold"].includes(subscription?.planId);
+    const hasPremium = ["bronze", "silver", "gold"].includes(
+      subscription?.planId,
+    );
 
     if (!hasPremium && userData.hasPaidForResume) {
       // Consume the ₹50 single-use payment
       await db.collection("users").doc(uid).update({
-        hasPaidForResume: admin.firestore.FieldValue.delete()
+        hasPaidForResume: admin.firestore.FieldValue.delete(),
       });
     }
 
     // Ensure it becomes default automatically
-    await db
-      .collection("users")
-      .doc(uid)
-      .update({
-        resumeId: resumeRef.id,
-        hasResume: true,
-        resumeUpdatedAt: new Date(),
-      });
+    await db.collection("users").doc(uid).update({
+      resumeId: resumeRef.id,
+      hasResume: true,
+      resumeUpdatedAt: new Date(),
+    });
 
     res.status(200).json({
       message: "Resume saved successfully",
@@ -345,7 +525,7 @@ router.post("/send-confirmation", async (req, res) => {
             <p style="color: #666; font-size: 14px; margin-bottom: 20px;">
               Your resume is now attached to your profile and will be automatically included in your internship applications.
             </p>
-            <a href="${process.env.FRONTEND_URL || 'http://localhost:3000'}/resume" 
+            <a href="${process.env.FRONTEND_URL || "http://localhost:3000"}/resume" 
                style="display: inline-block; padding: 12px 24px; background-color: #007bff; color: white; text-decoration: none; border-radius: 6px; font-weight: bold;">
               View My Resumes
             </a>
@@ -428,10 +608,10 @@ router.get("/access/:uid", async (req, res) => {
 
     const userData = userDoc.data();
     const subscription = userData.subscription || {};
-    
+
     // Check if user has premium subscription or has paid for resume explicitly
     const hasPremium = ["bronze", "silver", "gold"].includes(
-      subscription?.planId
+      subscription?.planId,
     );
     const hasPaidForResume = userData.hasPaidForResume === true;
     const canCreateResume = hasPremium || hasPaidForResume;
@@ -501,7 +681,10 @@ router.get("/:uid", async (req, res) => {
       return res.status(404).json({ message: "No resume found for this user" });
     }
 
-    const resumeDoc = await db.collection("resumes").doc(userData.resumeId).get();
+    const resumeDoc = await db
+      .collection("resumes")
+      .doc(userData.resumeId)
+      .get();
 
     if (!resumeDoc.exists) {
       return res.status(404).json({ message: "Resume not found" });
@@ -525,7 +708,9 @@ router.delete("/delete-resume/:uid/:resumeId", async (req, res) => {
 
     const resumeDoc = await db.collection("resumes").doc(resumeId).get();
     if (!resumeDoc.exists || resumeDoc.data().uid !== uid) {
-      return res.status(404).json({ message: "Resume not found or unauthorized" });
+      return res
+        .status(404)
+        .json({ message: "Resume not found or unauthorized" });
     }
 
     await db.collection("resumes").doc(resumeId).delete();
@@ -535,7 +720,7 @@ router.delete("/delete-resume/:uid/:resumeId", async (req, res) => {
     if (userDoc.exists && userDoc.data().resumeId === resumeId) {
       await db.collection("users").doc(uid).update({
         resumeId: admin.firestore.FieldValue.delete(),
-        hasResume: false
+        hasResume: false,
       });
     }
 
@@ -554,18 +739,50 @@ router.post("/set-default-resume", async (req, res) => {
 
     const resumeDoc = await db.collection("resumes").doc(resumeId).get();
     if (!resumeDoc.exists || resumeDoc.data().uid !== uid) {
-      return res.status(404).json({ message: "Resume not found or unauthorized" });
+      return res
+        .status(404)
+        .json({ message: "Resume not found or unauthorized" });
     }
 
     await db.collection("users").doc(uid).update({
       resumeId,
       hasResume: true,
-      resumeUpdatedAt: new Date()
+      resumeUpdatedAt: new Date(),
     });
 
     res.status(200).json({ message: "Default resume updated successfully" });
   } catch (error) {
     console.error("Error setting default resume:", error);
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+});
+
+// Rename a resume
+router.put("/rename-resume/:uid/:resumeId", async (req, res) => {
+  try {
+    db = admin.firestore();
+    const { uid, resumeId } = req.params;
+    const { resumeName } = req.body;
+
+    if (!resumeName || !resumeName.trim()) {
+      return res.status(400).json({ message: "Resume name is required" });
+    }
+
+    const resumeDoc = await db.collection("resumes").doc(resumeId).get();
+    if (!resumeDoc.exists || resumeDoc.data().uid !== uid) {
+      return res
+        .status(404)
+        .json({ message: "Resume not found or unauthorized" });
+    }
+
+    await db.collection("resumes").doc(resumeId).update({
+      resumeName: resumeName.trim(),
+      updatedAt: new Date(),
+    });
+
+    res.status(200).json({ message: "Resume renamed successfully" });
+  } catch (error) {
+    console.error("Error renaming resume:", error);
     res.status(500).json({ message: "Server error", error: error.message });
   }
 });

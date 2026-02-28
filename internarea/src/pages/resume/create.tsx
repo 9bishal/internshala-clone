@@ -58,7 +58,6 @@ export default function CreateResume() {
 
       // Wait, let any user request the OTP and pay the Rs 50.
       if (access.hasPaidForResume) {
-        toast.success("Resume creation already unlocked!");
         router.push("/resume-editor");
         return;
       }
@@ -164,14 +163,50 @@ export default function CreateResume() {
             color: "#3B82F6",
           },
           modal: {
-            ondismiss: () => {
+            ondismiss: async () => {
               setProcessingPayment(false);
               toast.info("Payment cancelled");
+              // Notify backend about cancellation
+              try {
+                await axios.post(
+                  getApiEndpoint("/resume-razorpay/payment-failed"),
+                  {
+                    uid: user.uid,
+                    razorpay_order_id: orderId,
+                    reason: "Payment cancelled by user",
+                  }
+                );
+              } catch (err) {
+                console.error("Failed to record payment cancellation:", err);
+              }
             },
           },
         };
 
         const razorpay = new window.Razorpay(options);
+
+        // Handle payment failure from Razorpay
+        razorpay.on("payment.failed", async (response: any) => {
+          setProcessingPayment(false);
+          const failReason =
+            response.error?.description ||
+            response.error?.reason ||
+            "Payment failed";
+          toast.error(`Payment failed: ${failReason}`);
+          try {
+            await axios.post(
+              getApiEndpoint("/resume-razorpay/payment-failed"),
+              {
+                uid: user.uid,
+                razorpay_order_id: orderId,
+                reason: failReason,
+              }
+            );
+          } catch (err) {
+            console.error("Failed to record payment failure:", err);
+          }
+        });
+
         razorpay.open();
       };
 

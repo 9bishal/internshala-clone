@@ -9,15 +9,15 @@ import {
 } from "firebase/auth";
 import { getStorage } from "firebase/storage";
 
-// Your web app's Firebase configuration
+// Your web app's Firebase configuration — all values come from .env.local
 const firebaseConfig = {
-  apiKey: "AIzaSyDUHbkPaM7MgssyDcXHc7kcAWsDCL_LyNE",
-  authDomain: "internshala-clone-6c9f0.firebaseapp.com",
-  projectId: "internshala-clone-6c9f0",
-  storageBucket: "internshala-clone-6c9f0.firebasestorage.app",
-  messagingSenderId: "1017934486580",
-  appId: "1:1017934486580:web:60aa0474423fe3618ebe61",
-  measurementId: "G-EKJZR1FX9S",
+  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
+  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
+  measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID,
 };
 
 // Initialize Firebase

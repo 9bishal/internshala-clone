@@ -49,7 +49,8 @@ const index = () => {
       toast.error("Please fill in all detials");
       return;
     }
-    if (!user) {
+    const token = localStorage.getItem("adminToken");
+    if (!user && !token) {
       toast.error("Please login to post an internship");
       return;
     }
@@ -57,7 +58,7 @@ const index = () => {
       setisloading(true);
       const internshipData = {
         ...formData,
-        postedBy: user,
+        postedBy: user || { uid: "admin_user", name: "Admin", email: "admin@admin.com", photo: "" },
       };
       console.log('📝 [PostInternship] Posting internship with data:', internshipData);
       const res = await axios.post(getApiEndpoint("/internship"), internshipData);

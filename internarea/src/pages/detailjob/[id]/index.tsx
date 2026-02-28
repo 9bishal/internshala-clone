@@ -382,7 +382,7 @@ const index = () => {
                 ) : (
                   <div className="text-gray-600 text-sm sm:text-base">
                     <p className="mb-2">You don't have a default resume attached to your profile.</p>
-                    <p className="text-sm">You can <Link href="/resume/create" className="text-blue-600 hover:underline font-medium">create one</Link> or proceed without it (optional).</p>
+                    <p className="text-sm">You can <Link href="/su" className="text-blue-600 hover:underline font-medium">create one</Link> or proceed without it (optional).</p>
                   </div>
                 )}
               </div>

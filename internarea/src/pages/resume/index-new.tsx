@@ -20,6 +20,7 @@ import { toast } from "react-toastify";
 
 interface Resume {
   id: string;
+  resumeName?: string;
   fullName: string;
   email: string;
   phone: string;
@@ -240,7 +241,7 @@ export default function ResumeBuilder() {
                 <div className="flex items-start justify-between mb-4">
                   <div className="flex-1">
                     <h3 className="text-lg font-semibold text-gray-900 mb-1">
-                      {resume.fullName}
+                      {resume.resumeName || resume.fullName}
                     </h3>
                     <p className="text-sm text-gray-600">{resume.email}</p>
                   </div>

@@ -12,6 +12,9 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import { LogOut } from 'lucide-react';
 import { toast } from 'react-toastify';
+import axios from 'axios';
+import { getApiEndpoint } from '@/utils/api';
+
 const index = () => {
     const router = useRouter();
     const [isAuthorized, setIsAuthorized] = useState(false);
@@ -25,6 +28,33 @@ const index = () => {
         }
     }, [router]);
 
+    const [statsData, setStatsData] = useState({
+      totalApplications: 0,
+      activeJobs: 0,
+      activeInternships: 0,
+      conversionRate: 0,
+    });
+    const [loadingStats, setLoadingStats] = useState(true);
+
+    useEffect(() => {
+        const fetchStats = async () => {
+          try {
+            const { data } = await axios.get(getApiEndpoint('/admin/stats'));
+            if (data?.success) {
+              setStatsData(data.data);
+            }
+          } catch (error) {
+            console.error("Error fetching stats:", error);
+          } finally {
+            setLoadingStats(false);
+          }
+        };
+
+        if (isAuthorized) {
+          fetchStats();
+        }
+    }, [isAuthorized]);
+
     const handleLogout = () => {
         localStorage.removeItem("adminToken");
         toast.success("Logged out from Admin Panel");
@@ -34,10 +64,10 @@ const index = () => {
     if (!isAuthorized) return null;
 
     const stats = [
-        { label: 'Total Applications', value: '2,345', change: '+12%', changeType: 'positive' },
-        { label: 'Active Jobs', value: '45', change: '+3%', changeType: 'positive' },
-        { label: 'Active Internships', value: '89', change: '+24%', changeType: 'positive' },
-        { label: 'Conversion Rate', value: '5.25%', change: '-1.3%', changeType: 'negative' },
+        { label: 'Total Applications', value: statsData.totalApplications.toLocaleString(), change: '+12%', changeType: 'positive' },
+        { label: 'Active Jobs', value: statsData.activeJobs.toLocaleString(), change: '+3%', changeType: 'positive' },
+        { label: 'Active Internships', value: statsData.activeInternships.toLocaleString(), change: '+24%', changeType: 'positive' },
+        { label: 'Conversion Rate', value: `${statsData.conversionRate}%`, change: '-1.3%', changeType: 'negative' },
       ];
     
       const menuItems = [
