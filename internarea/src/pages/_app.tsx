@@ -71,6 +71,27 @@ function ChromeOTPModal() {
   const [verifying, setVerifying] = useState(false);
   const [error, setError] = useState("");
 
+  // If OTP is required, strictly block viewing or interacting with the application
+  useEffect(() => {
+    if (chromeOTPRequired) {
+      document.body.style.overflow = 'hidden';
+      const appRoot = document.getElementById('main-app-container');
+      if (appRoot) {
+        appRoot.style.filter = 'blur(12px)';
+        appRoot.style.pointerEvents = 'none';
+        appRoot.style.userSelect = 'none';
+      }
+    } else {
+      document.body.style.overflow = 'auto';
+      const appRoot = document.getElementById('main-app-container');
+      if (appRoot) {
+        appRoot.style.filter = 'none';
+        appRoot.style.pointerEvents = 'auto';
+        appRoot.style.userSelect = 'auto';
+      }
+    }
+  }, [chromeOTPRequired]);
+
   if (!chromeOTPRequired || !chromeOTPUid) return null;
 
   const handleVerify = async () => {
@@ -392,7 +413,7 @@ export default function App({ Component, pageProps }: AppProps) {
     <Provider store={store}>
       <AuthListener />
       <ChromeOTPModal />
-      <div className="bg-white min-h-screen">
+      <div id="main-app-container" className="bg-white min-h-screen transition-all duration-300">
         <ToastContainer />
         {!isAdminRoute && <Navbar />}
         <Component {...pageProps} />
