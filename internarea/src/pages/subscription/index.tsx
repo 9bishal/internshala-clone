@@ -113,7 +113,7 @@ export default function SubscriptionPlans() {
 
   const handleSubscribe = async (planId: string) => {
     if (subscription?.planId === planId) {
-      toast.info("You are already on this plan");
+      toast.info(t("already_on_plan"));
       return;
     }
 
@@ -123,14 +123,14 @@ export default function SubscriptionPlans() {
       return;
     }
 
-    // TODO: Uncomment in production to enforce payment time window
-    // if (!isPaymentWindowOpen()) {
-    //   toast.error(
-    //     "⏰ Payments are only allowed between 10:00 AM and 11:00 AM IST. Please try again during this window.",
-    //     { autoClose: 6000 }
-    //   );
-    //   return;
-    // }
+    // Enforce payment time window (10 AM - 11 AM IST)
+    if (!isPaymentWindowOpen()) {
+      toast.error(
+        "⏰ Payments are only allowed between 10:00 AM and 11:00 AM IST. Please try again during this window.",
+        { autoClose: 6000 }
+      );
+      return;
+    }
 
     if (!window.Razorpay) {
       toast.error("Payment system is loading. Please wait a moment and try again.");
@@ -245,7 +245,7 @@ export default function SubscriptionPlans() {
   const handleCancelSubscription = async () => {
     if (
       !window.confirm(
-        "Are you sure you want to cancel your subscription? You will be downgraded to the free plan."
+        t("cancel_confirm")
       )
     ) {
       return;
@@ -346,7 +346,7 @@ export default function SubscriptionPlans() {
               onClick={() => router.push("/internship")}
               className="w-full py-3 bg-gray-100 text-gray-700 rounded-lg font-semibold hover:bg-gray-200 transition"
             >
-              Browse Internships
+              {t("browse_internships_btn")}
             </button>
           </div>
         </div>
@@ -373,7 +373,7 @@ export default function SubscriptionPlans() {
           </p>
         </div>
 
-        {/* TODO: Uncomment in production to show payment window status banner
+        {/* Payment window status banner */}
         <div
           className={`mb-8 rounded-xl p-4 flex items-start gap-3 ${
             paymentWindowOpen
@@ -385,9 +385,9 @@ export default function SubscriptionPlans() {
             <>
               <CreditCard className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
               <div>
-                <p className="font-semibold text-green-800">Payment Window is Open</p>
+                <p className="font-semibold text-green-800">{t("payment_window_open")}</p>
                 <p className="text-green-700 text-sm">
-                  You can subscribe now. The payment window is open from 10:00 AM to 11:00 AM IST.
+                  {t("payment_window_open_desc")}
                 </p>
               </div>
             </>
@@ -395,15 +395,14 @@ export default function SubscriptionPlans() {
             <>
               <Clock className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
               <div>
-                <p className="font-semibold text-amber-800">Payment Window is Closed</p>
+                <p className="font-semibold text-amber-800">{t("payment_window_closed")}</p>
                 <p className="text-amber-700 text-sm">
-                  Payments are only accepted between <strong>10:00 AM – 11:00 AM IST</strong>. Please come back during this window to subscribe.
+                  {t("payment_window_closed_desc")}
                 </p>
               </div>
             </>
           )}
         </div>
-        */}
 
         {/* Current Subscription Info */}
         {subscription && subscription.planId !== "free" && (

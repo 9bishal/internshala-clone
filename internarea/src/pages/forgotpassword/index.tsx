@@ -209,7 +209,7 @@ export default function ForgotPassword() {
               <div className="space-y-4">
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-2">
                   <p className="text-sm text-gray-700">
-                    OTP sent to <span className="font-semibold">{email}</span>
+                    {t('otp_sent_to')} <span className="font-semibold">{email}</span>
                   </p>
                   {timer > 0 && (
                     <p className="text-xs text-gray-500 mt-1">
@@ -220,7 +220,7 @@ export default function ForgotPassword() {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Enter OTP
+                    {t('enter_otp')}
                   </label>
                   <input
                     type="text"
@@ -237,7 +237,7 @@ export default function ForgotPassword() {
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     <Lock className="w-4 h-4 inline mr-2" />
-                    New Password
+                    {t('new_password')}
                   </label>
                   <div className="relative">
                     <input
@@ -272,7 +272,7 @@ export default function ForgotPassword() {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Confirm Password
+                    {t('confirm_password')}
                   </label>
                   <input
                     type={showPassword ? "text" : "password"}

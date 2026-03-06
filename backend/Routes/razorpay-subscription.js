@@ -71,7 +71,7 @@ const SUBSCRIPTION_PLANS = {
 function isPaymentTimeAllowed() {
   const now = new Date();
   const istTime = new Date(
-    now.toLocaleString("en-US", { timeZone: "Asia/Kolkata" })
+    now.toLocaleString("en-US", { timeZone: "Asia/Kolkata" }),
   );
   const hour = istTime.getHours();
   return hour >= 10 && hour < 11;
@@ -84,7 +84,7 @@ router.get("/plans", async (req, res) => {
       ([key, plan]) => ({
         id: key,
         ...plan,
-      })
+      }),
     );
 
     res.status(200).json({ plans: plansArray });
@@ -112,15 +112,12 @@ router.get("/:uid", async (req, res) => {
         applicationsLimit: 1,
       };
 
-      await db
-        .collection("users")
-        .doc(uid)
-        .set(
-          {
-            subscription: freeSubscription,
-          },
-          { merge: true }
-        );
+      await db.collection("users").doc(uid).set(
+        {
+          subscription: freeSubscription,
+        },
+        { merge: true },
+      );
 
       return res.status(200).json({
         ...freeSubscription,
@@ -144,16 +141,13 @@ router.get("/:uid", async (req, res) => {
       subscription.expiresAt &&
       new Date() > subscription.expiresAt.toDate()
     ) {
-      await db
-        .collection("users")
-        .doc(uid)
-        .update({
-          "subscription.planId": "free",
-          "subscription.status": "expired",
-          "subscription.applicationsLimit": 1,
-          "subscription.applicationsUsed": 0,
-          "subscription.expiredAt": new Date(),
-        });
+      await db.collection("users").doc(uid).update({
+        "subscription.planId": "free",
+        "subscription.status": "expired",
+        "subscription.applicationsLimit": 1,
+        "subscription.applicationsUsed": 0,
+        "subscription.expiredAt": new Date(),
+      });
 
       return res.status(200).json({
         planId: "free",
@@ -188,15 +182,15 @@ router.post("/create-order", async (req, res) => {
       return res.status(400).json({ message: "Invalid plan ID" });
     }
 
-    // TODO: Uncomment in production to enforce payment time window (10 AM - 11 AM IST)
-    // if (!isPaymentTimeAllowed()) {
-    //   return res.status(403).json({
-    //     message:
-    //       "Payments are only allowed between 10:00 AM and 11:00 AM IST. Please try again during this time window.",
-    //     paymentWindowStart: "10:00 AM IST",
-    //     paymentWindowEnd: "11:00 AM IST",
-    //   });
-    // }
+    // Enforce payment time window (10 AM - 11 AM IST)
+    if (!isPaymentTimeAllowed()) {
+      return res.status(403).json({
+        message:
+          "Payments are only allowed between 10:00 AM and 11:00 AM IST. Please try again during this time window.",
+        paymentWindowStart: "10:00 AM IST",
+        paymentWindowEnd: "11:00 AM IST",
+      });
+    }
 
     const plan = SUBSCRIPTION_PLANS[planId];
 
@@ -282,12 +276,9 @@ router.post("/verify-payment", async (req, res) => {
       lastOrderId: razorpay_order_id,
     };
 
-    await db
-      .collection("users")
-      .doc(uid)
-      .update({
-        subscription: subscriptionData,
-      });
+    await db.collection("users").doc(uid).update({
+      subscription: subscriptionData,
+    });
 
     // Store payment record
     const paymentRecord = {
@@ -312,7 +303,7 @@ router.post("/verify-payment", async (req, res) => {
         userData.name || "User",
         paymentRecord,
         subscriptionData,
-        language
+        language,
       );
     } catch (emailError) {
       console.error("Error sending invoice email:", emailError);
@@ -333,9 +324,18 @@ router.post("/verify-payment", async (req, res) => {
 });
 
 // Send invoice email
-async function sendInvoiceEmail(email, name, payment, subscription, language = "en") {
+async function sendInvoiceEmail(
+  email,
+  name,
+  payment,
+  subscription,
+  language = "en",
+) {
   const templates = emailTemplates[language] || emailTemplates["en"];
-  const subject = templates.subscription_invoice_subject.replace("{planName}", payment.planName);
+  const subject = templates.subscription_invoice_subject.replace(
+    "{planName}",
+    payment.planName,
+  );
 
   const msg = {
     to: email,
@@ -380,7 +380,7 @@ async function sendInvoiceEmail(email, name, payment, subscription, language = "
 
           <div style="background-color: #eff6ff; border: 1px solid #bfdbfe; padding: 16px; border-radius: 8px; margin-bottom: 20px;">
             <p style="color: #1d4ed8; font-size: 14px; margin: 0;">
-              <strong>Transaction Date:</strong> ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', dateStyle: 'long', timeStyle: 'short' })} IST
+              <strong>Transaction Date:</strong> ${new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata", dateStyle: "long", timeStyle: "short" })} IST
             </p>
           </div>
           
@@ -398,7 +398,13 @@ async function sendInvoiceEmail(email, name, payment, subscription, language = "
 }
 
 // Send payment failure email
-async function sendPaymentFailureEmail(email, name, planName, errorDescription, language = "en") {
+async function sendPaymentFailureEmail(
+  email,
+  name,
+  planName,
+  errorDescription,
+  language = "en",
+) {
   const msg = {
     to: email,
     from: process.env.DEFAULT_FROM_EMAIL,
@@ -446,7 +452,14 @@ async function sendPaymentFailureEmail(email, name, planName, errorDescription, 
 router.post("/payment-failed", async (req, res) => {
   try {
     db = admin.firestore();
-    const { uid, planId, razorpay_order_id, error_code, error_description, language = "en" } = req.body;
+    const {
+      uid,
+      planId,
+      razorpay_order_id,
+      error_code,
+      error_description,
+      language = "en",
+    } = req.body;
 
     if (!uid || !planId) {
       return res.status(400).json({ message: "UID and plan ID are required" });
@@ -485,7 +498,7 @@ router.post("/payment-failed", async (req, res) => {
           userData.name || "User",
           plan.name,
           error_description,
-          language
+          language,
         );
         console.log(`📧 Payment failure email sent to ${userData.email}`);
       } catch (emailError) {
@@ -581,12 +594,9 @@ router.post("/increment-application", async (req, res) => {
 
     const newCount = (subscription.applicationsUsed || 0) + 1;
 
-    await db
-      .collection("users")
-      .doc(uid)
-      .update({
-        "subscription.applicationsUsed": newCount,
-      });
+    await db.collection("users").doc(uid).update({
+      "subscription.applicationsUsed": newCount,
+    });
 
     res.status(200).json({
       message: "Application count incremented",
@@ -611,16 +621,13 @@ router.post("/cancel/:uid", async (req, res) => {
       return res.status(404).json({ message: "User not found" });
     }
 
-    await db
-      .collection("users")
-      .doc(uid)
-      .update({
-        "subscription.planId": "free",
-        "subscription.status": "cancelled",
-        "subscription.applicationsLimit": 1,
-        "subscription.applicationsUsed": 0,
-        "subscription.cancelledAt": new Date(),
-      });
+    await db.collection("users").doc(uid).update({
+      "subscription.planId": "free",
+      "subscription.status": "cancelled",
+      "subscription.applicationsLimit": 1,
+      "subscription.applicationsUsed": 0,
+      "subscription.cancelledAt": new Date(),
+    });
 
     res.status(200).json({ message: "Subscription cancelled successfully" });
   } catch (error) {
