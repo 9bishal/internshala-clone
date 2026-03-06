@@ -13,6 +13,7 @@ import axios from 'axios';
 import { getApiEndpoint } from "@/utils/api";
 import { useRouter } from "next/router";
 import { useTranslation } from "@/utils/i18n";
+import { Analytics } from '@vercel/analytics/next';
 
 // Helper functions for device detection (safe for SSR)
 const getBrowserInfo = () => {
@@ -385,6 +386,7 @@ export default function App({ Component, pageProps }: AppProps) {
         <Component {...pageProps} />
         {!isAdminRoute && <Footer />}
       </div>
+      <Analytics />
     </Provider>
   );
 }
