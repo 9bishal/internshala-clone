@@ -18,11 +18,17 @@ import { useTranslation } from "@/utils/i18n";
 const getBrowserInfo = () => {
   if (typeof window === 'undefined') return "Unknown";
   const userAgent = navigator.userAgent;
+  
+  // Chromium-based browsers must be checked BEFORE Chrome as they all contain "Chrome" in their UA
+  if (userAgent.includes("Opera") || userAgent.includes("OPR")) return "Opera";
+  if (userAgent.includes("Edge") || userAgent.includes("Edg")) return "Edge";
+  if ((navigator as any).brave !== undefined) return "Brave"; 
+
+  // Regular browsers
   if (userAgent.includes("Chrome")) return "Chrome";
   if (userAgent.includes("Firefox")) return "Firefox";
-  if (userAgent.includes("Safari")) return "Safari";
-  if (userAgent.includes("Edge")) return "Edge";
-  if (userAgent.includes("Opera")) return "Opera";
+  if (userAgent.includes("Safari") && !userAgent.includes("Chrome")) return "Safari";
+  
   return "Unknown";
 };
 
