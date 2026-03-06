@@ -20,8 +20,8 @@ router.post("/sync-user", async (req, res) => {
     const userDoc = await userRef.get();
 
     // Extract name from email if not provided
-    const displayName = name || email.split('@')[0] || "User";
-    
+    const displayName = name || email.split("@")[0] || "User";
+
     const userData = {
       uid,
       name: displayName,
@@ -66,15 +66,19 @@ router.delete("/delete-all-users", async (req, res) => {
 
     do {
       const listResult = await admin.auth().listUsers(1000, nextPageToken);
-      const uids = listResult.users.map(user => user.uid);
-      
+      const uids = listResult.users.map((user) => user.uid);
+
       if (uids.length > 0) {
         const deleteResult = await admin.auth().deleteUsers(uids);
         deletedAuthCount += deleteResult.successCount;
-        console.log(`🗑️ Deleted ${deleteResult.successCount} users from Firebase Auth`);
-        
+        console.log(
+          `🗑️ Deleted ${deleteResult.successCount} users from Firebase Auth`,
+        );
+
         if (deleteResult.failureCount > 0) {
-          console.error(`⚠️ Failed to delete ${deleteResult.failureCount} users`);
+          console.error(
+            `⚠️ Failed to delete ${deleteResult.failureCount} users`,
+          );
         }
       }
 
@@ -84,9 +88,9 @@ router.delete("/delete-all-users", async (req, res) => {
     // Delete all user documents from Firestore
     let deletedFirestoreCount = 0;
     const usersSnapshot = await db.collection("users").get();
-    
+
     const batch = db.batch();
-    usersSnapshot.forEach(doc => {
+    usersSnapshot.forEach((doc) => {
       batch.delete(doc.ref);
       deletedFirestoreCount++;
     });
@@ -104,12 +108,14 @@ router.delete("/delete-all-users", async (req, res) => {
     });
   } catch (error) {
     console.error("Error deleting all users:", error);
-    res.status(500).json({ message: "Failed to delete users", error: error.message });
+    res
+      .status(500)
+      .json({ message: "Failed to delete users", error: error.message });
   }
 });
 
 // Configure email service (using SendGrid)
-const sgMail = require('@sendgrid/mail');
+const sgMail = require("@sendgrid/mail");
 sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 
 // Generate OTP
@@ -120,10 +126,10 @@ function generateOTP() {
 // Password generator: random password with ONLY uppercase and lowercase letters
 // No numbers, no special characters
 function generateRandomPassword(length = 12) {
-  const uppercase = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-  const lowercase = 'abcdefghijklmnopqrstuvwxyz';
+  const uppercase = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+  const lowercase = "abcdefghijklmnopqrstuvwxyz";
   const allChars = uppercase + lowercase;
-  let password = '';
+  let password = "";
   // Ensure at least one uppercase and one lowercase
   password += uppercase.charAt(Math.floor(Math.random() * uppercase.length));
   password += lowercase.charAt(Math.floor(Math.random() * lowercase.length));
@@ -131,24 +137,40 @@ function generateRandomPassword(length = 12) {
     password += allChars.charAt(Math.floor(Math.random() * allChars.length));
   }
   // Shuffle the password
-  return password.split('').sort(() => Math.random() - 0.5).join('');
+  return password
+    .split("")
+    .sort(() => Math.random() - 0.5)
+    .join("");
 }
 
 // Check if mobile login time is allowed (10:00 AM - 1:00 PM IST)
 function isMobileLoginTimeAllowed() {
   const now = new Date();
-  const istTime = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
+  const istTime = new Date(
+    now.toLocaleString("en-US", { timeZone: "Asia/Kolkata" }),
+  );
   const hour = istTime.getHours();
   return hour >= 10 && hour < 13;
 }
 
 // Send OTP via email using SendGrid
-async function sendOTPEmail(email, otp, language = "en", type = "password_reset") {
+async function sendOTPEmail(
+  email,
+  otp,
+  language = "en",
+  type = "password_reset",
+) {
   try {
     const templates = emailTemplates[language] || emailTemplates["en"];
     const subject = templates.otp_subject;
-    const title = type === "chrome_login" ? templates.chrome_login_title : templates.password_reset_title;
-    const body = type === "chrome_login" ? templates.chrome_login_body : templates.password_reset_body;
+    const title =
+      type === "chrome_login"
+        ? templates.chrome_login_title
+        : templates.password_reset_title;
+    const body =
+      type === "chrome_login"
+        ? templates.chrome_login_body
+        : templates.password_reset_body;
 
     const msg = {
       to: email,
@@ -206,7 +228,9 @@ router.post("/forgot-password", async (req, res) => {
     const { email, phone, language = "en" } = req.body;
 
     if (!email && !phone) {
-      return res.status(400).json({ message: "Email or phone number is required" });
+      return res
+        .status(400)
+        .json({ message: "Email or phone number is required" });
     }
 
     const identifier = email || phone;
@@ -215,7 +239,9 @@ router.post("/forgot-password", async (req, res) => {
 
     // Check daily reset limit (max 1 reset per day as per task requirement)
     const today = new Date().toISOString().split("T")[0];
-    const otpLimitRef = db.collection("otp_limits").doc(`${identifier}_${today}`);
+    const otpLimitRef = db
+      .collection("otp_limits")
+      .doc(`${identifier}_${today}`);
     const otpLimitDoc = await otpLimitRef.get();
 
     let otpCount = 0;
@@ -264,7 +290,12 @@ router.post("/forgot-password", async (req, res) => {
 
     // Send OTP via email
     if (email) {
-      const emailSent = await sendOTPEmail(email, otp, language, "password_reset");
+      const emailSent = await sendOTPEmail(
+        email,
+        otp,
+        language,
+        "password_reset",
+      );
 
       if (emailSent) {
         res.status(200).json({
@@ -337,7 +368,12 @@ router.post("/verify-otp-reset", async (req, res) => {
       resetAt: new Date(),
     });
 
-    res.status(200).json({ message: "Password reset successfully! You can now login with your new password." });
+    res
+      .status(200)
+      .json({
+        message:
+          "Password reset successfully! You can now login with your new password.",
+      });
   } catch (error) {
     console.error("Error in verify-otp-reset:", error);
     res.status(500).json({ message: "Server error", error: error.message });
@@ -351,68 +387,14 @@ router.post("/login-history", async (req, res) => {
     const { uid, email, deviceInfo, ipAddress, language = "en" } = req.body;
 
     if (!uid || !email) {
-      return res.status(400).json({ message: "User ID and email are required" });
+      return res
+        .status(400)
+        .json({ message: "User ID and email are required" });
     }
 
     db = admin.firestore();
 
-    // --- ACCESS RULE: Mobile device login only allowed between 10 AM - 1 PM IST ---
-    const deviceType = (deviceInfo?.device || "Unknown").toLowerCase();
-    if (deviceType === "mobile") {
-      if (!isMobileLoginTimeAllowed()) {
-        return res.status(403).json({
-          message: "Mobile login is only allowed between 10:00 AM and 1:00 PM IST.",
-          blocked: true,
-          reason: "mobile_time_restriction",
-          allowedWindow: { start: "10:00 AM IST", end: "1:00 PM IST" },
-        });
-      }
-    }
-
-    // --- ACCESS RULE: Chrome browser requires OTP verification ---
-    const browserName = (deviceInfo?.browser || "Unknown").toLowerCase();
-    let requiresChromeOTP = false;
-    if (browserName === "chrome") {
-      requiresChromeOTP = true;
-
-      // Check if an OTP was already sent recently (within last 10 mins) to prevent duplicate emails
-      const existingOtpDoc = await db.collection("chrome_login_otp").doc(uid).get();
-      const existingOtpData = existingOtpDoc.exists ? existingOtpDoc.data() : null;
-      
-      let shouldSendNewOTP = true;
-      if (existingOtpData && existingOtpData.createdAt) {
-        const createdAt = existingOtpData.createdAt.toDate ? existingOtpData.createdAt.toDate() : new Date(existingOtpData.createdAt);
-        const minutesSinceLastOTP = (Date.now() - createdAt.getTime()) / (1000 * 60);
-        if (minutesSinceLastOTP < 10 && !existingOtpData.verified) {
-          shouldSendNewOTP = false; // Reuse existing OTP, don't send another email
-          console.log(`⏭️ Skipping Chrome OTP email for ${email} - one was sent ${minutesSinceLastOTP.toFixed(1)} min ago`);
-        }
-      }
-
-      if (shouldSendNewOTP) {
-        // Generate and store OTP for Chrome verification
-        const otp = generateOTP();
-        const otpExpiry = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
-
-        await db.collection("chrome_login_otp").doc(uid).set({
-          otp,
-          email,
-          expiresAt: otpExpiry,
-          createdAt: new Date(),
-          verified: false,
-        });
-
-        // Send OTP email
-        try {
-          await sendOTPEmail(email, otp, language, "chrome_login");
-          console.log(`📧 Chrome OTP email sent to ${email} (Language: ${language})`);
-        } catch (emailError) {
-          console.error("Failed to send Chrome OTP email:", emailError);
-        }
-      }
-    }
-
-    // Get user's login history
+    // --- 1. FIRST: Get user's login history ---
     const userRef = db.collection("users").doc(uid);
     const userDoc = await userRef.get();
 
@@ -429,6 +411,7 @@ router.post("/login-history", async (req, res) => {
         os: deviceInfo?.os || "Unknown",
         device: deviceInfo?.device || "Unknown",
       },
+      status: "success",
     };
 
     // Check for suspicious login attempts
@@ -439,17 +422,16 @@ router.post("/login-history", async (req, res) => {
       const lastLogin = loginHistory[0];
       let timeDiff = Infinity;
       try {
-        const lastTimestamp = lastLogin.timestamp?.toDate ? lastLogin.timestamp.toDate() : new Date(lastLogin.timestamp);
+        const lastTimestamp = lastLogin.timestamp?.toDate
+          ? lastLogin.timestamp.toDate()
+          : new Date(lastLogin.timestamp);
         timeDiff = (new Date() - lastTimestamp) / (1000 * 60);
       } catch (e) {
         // Ignore date parsing errors
       }
 
       // Flag if login from different IP within short time
-      if (
-        lastLogin.ipAddress !== ipAddress &&
-        timeDiff < 10
-      ) {
+      if (lastLogin.ipAddress !== ipAddress && timeDiff < 10) {
         isSuspicious = true;
         suspiciousReason =
           "Multiple logins from different locations within 10 minutes";
@@ -457,11 +439,23 @@ router.post("/login-history", async (req, res) => {
 
       // Flag if login from very different location
       if (
-        lastLogin.deviceInfo.os !== deviceInfo?.os &&
-        lastLogin.deviceInfo.browser !== deviceInfo?.browser
+        lastLogin.deviceInfo?.os !== deviceInfo?.os &&
+        lastLogin.deviceInfo?.browser !== deviceInfo?.browser
       ) {
         isSuspicious = true;
         suspiciousReason = "Login from new device";
+      }
+    }
+
+    // --- 2. ACCESS RULE: Mobile device login only allowed between 10 AM - 1 PM IST ---
+    const deviceType = (deviceInfo?.device || "Unknown").toLowerCase();
+    let isMobileBlocked = false;
+    if (deviceType === "mobile") {
+      if (!isMobileLoginTimeAllowed()) {
+        isMobileBlocked = true;
+        loginRecord.status = "blocked (mobile time restriction)";
+        isSuspicious = true;
+        suspiciousReason = "Attempted login outside allowed mobile hours";
       }
     }
 
@@ -473,7 +467,7 @@ router.post("/login-history", async (req, res) => {
     });
     loginHistory = loginHistory.slice(0, 20);
 
-    // Update user document
+    // Update user document WITH the new history!
     await userRef.set(
       {
         uid,
@@ -481,15 +475,81 @@ router.post("/login-history", async (req, res) => {
         lastLogin: new Date(),
         loginHistory,
       },
-      { merge: true }
+      { merge: true },
     );
+
+    // IF MOBILE BLOCKED -> RETURN 403 IMMEDIATELY (History is now saved!)
+    if (isMobileBlocked) {
+      return res.status(403).json({
+        message:
+          "Mobile login is only allowed between 10:00 AM and 1:00 PM IST.",
+        blocked: true,
+        reason: "mobile_time_restriction",
+        allowedWindow: { start: "10:00 AM IST", end: "1:00 PM IST" },
+      });
+    }
+
+    // --- 3. ACCESS RULE: Chrome browser requires OTP verification ---
+    const browserName = (deviceInfo?.browser || "Unknown").toLowerCase();
+    let requiresChromeOTP = false;
+    if (browserName === "chrome") {
+      requiresChromeOTP = true;
+
+      // Check if an OTP was already sent recently (within last 10 mins) to prevent duplicate emails
+      const existingOtpDoc = await db
+        .collection("chrome_login_otp")
+        .doc(uid)
+        .get();
+      const existingOtpData = existingOtpDoc.exists
+        ? existingOtpDoc.data()
+        : null;
+
+      let shouldSendNewOTP = true;
+      if (existingOtpData && existingOtpData.createdAt) {
+        const createdAt = existingOtpData.createdAt.toDate
+          ? existingOtpData.createdAt.toDate()
+          : new Date(existingOtpData.createdAt);
+        const minutesSinceLastOTP =
+          (Date.now() - createdAt.getTime()) / (1000 * 60);
+        if (minutesSinceLastOTP < 10 && !existingOtpData.verified) {
+          shouldSendNewOTP = false; // Reuse existing OTP
+          console.log(
+            `⏭️ Skipping Chrome OTP email for ${email} - one was sent ${minutesSinceLastOTP.toFixed(1)} min ago`,
+          );
+        }
+      }
+
+      if (shouldSendNewOTP) {
+        const otp = generateOTP();
+        const otpExpiry = new Date(Date.now() + 10 * 60 * 1000);
+
+        await db.collection("chrome_login_otp").doc(uid).set({
+          otp,
+          email,
+          expiresAt: otpExpiry,
+          createdAt: new Date(),
+          verified: false,
+        });
+
+        try {
+          await sendOTPEmail(email, otp, language, "chrome_login");
+          console.log(
+            `📧 Chrome OTP email sent to ${email} (Language: ${language})`,
+          );
+        } catch (emailError) {
+          console.error("Failed to send Chrome OTP email:", emailError);
+        }
+      }
+    }
 
     res.status(200).json({
       message: "Login recorded",
       isSuspicious,
       suspiciousReason: isSuspicious ? suspiciousReason : null,
       requiresChromeOTP,
-      chromeOTPMessage: requiresChromeOTP ? "OTP sent to your email for Chrome browser verification" : null,
+      chromeOTPMessage: requiresChromeOTP
+        ? "OTP sent to your email for Chrome browser verification"
+        : null,
     });
   } catch (error) {
     console.error("Error in login-history:", error);
@@ -577,10 +637,7 @@ router.post("/verify-suspicious-login", async (req, res) => {
     db = admin.firestore();
 
     // Retrieve stored OTP
-    const otpDoc = await db
-      .collection("suspicious_login_otp")
-      .doc(uid)
-      .get();
+    const otpDoc = await db.collection("suspicious_login_otp").doc(uid).get();
 
     if (!otpDoc.exists) {
       return res.status(400).json({ message: "OTP not found or expired" });

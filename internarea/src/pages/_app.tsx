@@ -393,6 +393,30 @@ function AuthListener() {
   return null;
 }
 
+function AppContent({ Component, pageProps, isAdminRoute }: any) {
+  const chromeOTPRequired = useSelector(selectChromeOTPRequired);
+
+  return (
+    <div 
+      id="main-app-container" 
+      className="bg-white min-h-screen transition-all duration-300"
+      style={chromeOTPRequired ? {
+        filter: 'blur(20px)',
+        pointerEvents: 'none',
+        userSelect: 'none',
+        opacity: 0.8,
+        height: '100vh',
+        overflow: 'hidden'
+      } : {}}
+    >
+      <ToastContainer />
+      {!isAdminRoute && <Navbar />}
+      <Component {...pageProps} />
+      {!isAdminRoute && <Footer />}
+    </div>
+  );
+}
+
 export default function App({ Component, pageProps }: AppProps) {
   const router = useRouter();
   const adminRoutes = [
@@ -413,12 +437,7 @@ export default function App({ Component, pageProps }: AppProps) {
     <Provider store={store}>
       <AuthListener />
       <ChromeOTPModal />
-      <div id="main-app-container" className="bg-white min-h-screen transition-all duration-300">
-        <ToastContainer />
-        {!isAdminRoute && <Navbar />}
-        <Component {...pageProps} />
-        {!isAdminRoute && <Footer />}
-      </div>
+      <AppContent Component={Component} pageProps={pageProps} isAdminRoute={isAdminRoute} />
     </Provider>
   );
 }
