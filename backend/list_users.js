@@ -1,0 +1,18 @@
+const admin = require("firebase-admin");
+require("dotenv").config();
+admin.initializeApp({
+  credential: admin.credential.cert({
+    projectId: process.env.FIREBASE_PROJECT_ID,
+    privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
+    clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+  })
+});
+admin.auth().listUsers(10)
+  .then((ri) => {
+    console.log(ri.users.map(u => u.email));
+    process.exit(0);
+  })
+  .catch((e) => {
+    console.error(e);
+    process.exit(1);
+  });
