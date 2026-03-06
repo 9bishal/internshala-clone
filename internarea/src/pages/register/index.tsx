@@ -6,6 +6,7 @@ import {
   createUserWithEmailAndPassword,
   updateProfile,
 } from "@/firebase/firebase";
+import { sendEmailVerification } from "firebase/auth";
 import axios from "axios";
 import { getApiEndpoint } from "@/utils/api";
 import {
@@ -90,12 +91,20 @@ export default function Register() {
         console.warn("Backend sync failed, user still created:", syncError);
       }
 
-      toast.success("Account created successfully! Welcome aboard!");
+      try {
+        await sendEmailVerification(userCredential.user);
+      } catch (err) {
+        console.warn("Error sending verification email", err);
+      }
+
+      await auth.signOut();
+
+      toast.success("Account created! Please check your email to verify your account.");
       setRegistered(true);
 
       setTimeout(() => {
-        router.push("/");
-      }, 2000);
+        router.push("/login");
+      }, 3000);
     } catch (error: any) {
       if (error.code === "auth/email-already-in-use") {
         toast.error("An account with this email already exists. Please login.");
@@ -124,10 +133,10 @@ export default function Register() {
             Registration Successful!
           </h2>
           <p className="text-gray-600 mb-6">
-            Welcome, {name}! Redirecting to home page...
+            Welcome, {name}! Please check your email to verify your account before logging in.
           </p>
           <div className="animate-pulse text-indigo-600 text-sm">
-            Redirecting...
+            Redirecting to login...
           </div>
         </div>
       </div>

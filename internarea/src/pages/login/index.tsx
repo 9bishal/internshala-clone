@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/router";
 import Link from "next/link";
 import { auth, signInWithEmailAndPassword } from "@/firebase/firebase";
+import { sendEmailVerification } from "firebase/auth";
 import { Mail, Lock, Eye, EyeOff, ArrowLeft } from "lucide-react";
 import { toast } from "react-toastify";
 import { useSelector } from "react-redux";
@@ -33,7 +34,20 @@ export default function Login() {
     setLoading(true);
 
     try {
-      await signInWithEmailAndPassword(auth, email.trim(), password);
+      const result = await signInWithEmailAndPassword(auth, email.trim(), password);
+
+      if (!result.user.emailVerified) {
+        try {
+          await sendEmailVerification(result.user);
+        } catch (err) {
+          console.warn("Could not resend email verification", err);
+        }
+        await auth.signOut();
+        toast.error("Please verify your email before logging in. A new verification link has been sent to your inbox.");
+        setLoading(false);
+        return;
+      }
+
       toast.success("Logged in successfully!");
       // redirection will be handled by useEffect
     } catch (error: any) {
