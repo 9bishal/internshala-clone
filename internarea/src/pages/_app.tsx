@@ -229,6 +229,13 @@ function AuthListener() {
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged(async (authuser) => {
       if (authuser) {
+        // Enforce email verification immediately at the global auth listener level
+        if (authuser.email && !authuser.emailVerified) {
+          dispatch(logout());
+          await auth.signOut();
+          return;
+        }
+
         dispatch(
           login({
             uid: authuser.uid,
