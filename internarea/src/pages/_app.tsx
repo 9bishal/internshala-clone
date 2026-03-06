@@ -154,6 +154,7 @@ function ChromeOTPModal() {
             transition: 'border-color 0.2s',
             boxSizing: 'border-box',
             color: '#1a1a2e',
+            backgroundColor: '#ffffff',
           }}
           onFocus={(e) => {
             if (!error) e.target.style.borderColor = '#4285F4';
