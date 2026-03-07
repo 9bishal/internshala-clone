@@ -677,7 +677,7 @@ export default function ResumeEditor() {
                 onChange={(e) =>
                   setResumeData({ ...resumeData, resumeName: e.target.value })
                 }
-                className="w-full max-w-md px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full max-w-md px-4 py-2 bg-slate-50 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 placeholder="e.g. Frontend Developer Resume v1"
               />
             </div>
@@ -740,7 +740,7 @@ export default function ResumeEditor() {
                   onChange={(e) =>
                     setResumeData({ ...resumeData, fullName: e.target.value })
                   }
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-4 py-2 bg-slate-50 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   placeholder="John Doe"
                 />
               </div>
@@ -755,7 +755,7 @@ export default function ResumeEditor() {
                   onChange={(e) =>
                     setResumeData({ ...resumeData, email: e.target.value })
                   }
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-4 py-2 bg-slate-50 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   placeholder="john@example.com"
                 />
               </div>
@@ -770,7 +770,7 @@ export default function ResumeEditor() {
                   onChange={(e) =>
                     setResumeData({ ...resumeData, phone: e.target.value })
                   }
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-4 py-2 bg-slate-50 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   placeholder="+1 234 567 8900"
                 />
               </div>
@@ -785,7 +785,7 @@ export default function ResumeEditor() {
                   onChange={(e) =>
                     setResumeData({ ...resumeData, address: e.target.value })
                   }
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-4 py-2 bg-slate-50 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   placeholder="City, State, Country"
                 />
               </div>
@@ -801,7 +801,7 @@ export default function ResumeEditor() {
                   setResumeData({ ...resumeData, summary: e.target.value })
                 }
                 rows={4}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-4 py-2 bg-slate-50 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 placeholder="Brief overview of your professional background and goals..."
               />
             </div>
@@ -846,7 +846,7 @@ export default function ResumeEditor() {
                       onChange={(e) =>
                         updateExperience(exp.id, "company", e.target.value)
                       }
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="w-full px-4 py-2 bg-slate-50 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                       placeholder="Company name"
                     />
                   </div>
@@ -861,7 +861,7 @@ export default function ResumeEditor() {
                       onChange={(e) =>
                         updateExperience(exp.id, "position", e.target.value)
                       }
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="w-full px-4 py-2 bg-slate-50 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                       placeholder="Your role"
                     />
                   </div>
@@ -877,7 +877,7 @@ export default function ResumeEditor() {
                     onChange={(e) =>
                       updateExperience(exp.id, "duration", e.target.value)
                     }
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-4 py-2 bg-slate-50 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     placeholder="Jan 2020 - Dec 2022"
                   />
                 </div>
@@ -892,7 +892,7 @@ export default function ResumeEditor() {
                       updateExperience(exp.id, "description", e.target.value)
                     }
                     rows={3}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-4 py-2 bg-slate-50 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     placeholder="Describe your responsibilities and achievements..."
                   />
                 </div>
@@ -939,7 +939,7 @@ export default function ResumeEditor() {
                       onChange={(e) =>
                         updateEducation(edu.id, "institution", e.target.value)
                       }
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="w-full px-4 py-2 bg-slate-50 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                       placeholder="University/College name"
                     />
                   </div>
@@ -954,7 +954,7 @@ export default function ResumeEditor() {
                       onChange={(e) =>
                         updateEducation(edu.id, "degree", e.target.value)
                       }
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="w-full px-4 py-2 bg-slate-50 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                       placeholder="B.Tech, MBA, etc."
                     />
                   </div>
@@ -969,7 +969,7 @@ export default function ResumeEditor() {
                       onChange={(e) =>
                         updateEducation(edu.id, "year", e.target.value)
                       }
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="w-full px-4 py-2 bg-slate-50 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                       placeholder="2020 - 2024"
                     />
                   </div>
@@ -984,7 +984,7 @@ export default function ResumeEditor() {
                       onChange={(e) =>
                         updateEducation(edu.id, "percentage", e.target.value)
                       }
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="w-full px-4 py-2 bg-slate-50 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                       placeholder="85% or 8.5 CGPA"
                     />
                   </div>
@@ -1006,7 +1006,7 @@ export default function ResumeEditor() {
                 value={newSkill}
                 onChange={(e) => setNewSkill(e.target.value)}
                 onKeyPress={(e) => e.key === "Enter" && addSkill()}
-                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="flex-1 px-4 py-2 bg-slate-50 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 placeholder="Add a skill (e.g., JavaScript, Project Management)"
               />
               <button
@@ -1066,7 +1066,7 @@ export default function ResumeEditor() {
                       type="text"
                       value={link.label}
                       onChange={(e) => updateLink(link.id, "label", e.target.value)}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="w-full px-4 py-2 bg-slate-50 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     />
                   </div>
                   <div>
@@ -1075,7 +1075,7 @@ export default function ResumeEditor() {
                       type="url"
                       value={link.url}
                       onChange={(e) => updateLink(link.id, "url", e.target.value)}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="w-full px-4 py-2 bg-slate-50 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     />
                   </div>
                 </div>
@@ -1115,7 +1115,7 @@ export default function ResumeEditor() {
                       type="text"
                       value={proj.title}
                       onChange={(e) => updateProject(proj.id, "title", e.target.value)}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="w-full px-4 py-2 bg-slate-50 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     />
                   </div>
                   <div>
@@ -1124,7 +1124,7 @@ export default function ResumeEditor() {
                       type="url"
                       value={proj.link}
                       onChange={(e) => updateProject(proj.id, "link", e.target.value)}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="w-full px-4 py-2 bg-slate-50 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     />
                   </div>
                 </div>
@@ -1134,7 +1134,7 @@ export default function ResumeEditor() {
                     value={proj.description}
                     onChange={(e) => updateProject(proj.id, "description", e.target.value)}
                     rows={3}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-4 py-2 bg-slate-50 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   ></textarea>
                 </div>
               </div>
