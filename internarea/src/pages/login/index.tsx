@@ -5,11 +5,13 @@ import { auth, signInWithEmailAndPassword } from "@/firebase/firebase";
 import { sendEmailVerification } from "firebase/auth";
 import { Mail, Lock, Eye, EyeOff, ArrowLeft } from "lucide-react";
 import { toast } from "react-toastify";
-import { useSelector } from "react-redux";
-import { selectuser } from "@/Feature/Userslice";
+import { useSelector, useDispatch } from "react-redux";
+import { selectuser, setChromeOTPRequired } from "@/Feature/Userslice";
+import { getBrowserInfo } from "@/utils/deviceInfo";
 
 export default function Login() {
   const router = useRouter();
+  const dispatch = useDispatch();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -46,6 +48,13 @@ export default function Login() {
         toast.error("Please verify your email before logging in. A new verification link has been sent to your inbox.");
         setLoading(false);
         return;
+      }
+
+      // Eagerly check if the Chrome OTP modal needs to open to avoid flashing
+      const browserName = getBrowserInfo().toLowerCase();
+      const chromeVerifiedKey = `chrome_otp_verified_${result.user.uid}`;
+      if (browserName === "chrome" && !sessionStorage.getItem(chromeVerifiedKey)) {
+        dispatch(setChromeOTPRequired({ required: true, uid: result.user.uid }));
       }
 
       toast.success("Logged in successfully!");

@@ -160,6 +160,11 @@ async function sendOTPEmail(
   language = "en",
   type = "password_reset",
 ) {
+  // Always log the OTP to the console for testing/debugging purposes
+  console.log(
+    `\n=========================================\n🚨 SYSTEM OTP GENERATED FOR ${email} [${type}]\n🔐 OTP IS: ${otp}\n=========================================\n`,
+  );
+
   try {
     const templates = emailTemplates[language] || emailTemplates["en"];
     const subject = templates.otp_subject;
@@ -368,12 +373,10 @@ router.post("/verify-otp-reset", async (req, res) => {
       resetAt: new Date(),
     });
 
-    res
-      .status(200)
-      .json({
-        message:
-          "Password reset successfully! You can now login with your new password.",
-      });
+    res.status(200).json({
+      message:
+        "Password reset successfully! You can now login with your new password.",
+    });
   } catch (error) {
     console.error("Error in verify-otp-reset:", error);
     res.status(500).json({ message: "Server error", error: error.message });
@@ -511,10 +514,10 @@ router.post("/login-history", async (req, res) => {
           : new Date(existingOtpData.createdAt);
         const minutesSinceLastOTP =
           (Date.now() - createdAt.getTime()) / (1000 * 60);
-        if (minutesSinceLastOTP < 10 && !existingOtpData.verified) {
+        if (minutesSinceLastOTP < 1 && !existingOtpData.verified) {
           shouldSendNewOTP = false; // Reuse existing OTP
           console.log(
-            `⏭️ Skipping Chrome OTP email for ${email} - one was sent ${minutesSinceLastOTP.toFixed(1)} min ago`,
+            `\n=========================================\n⏭️ SKIPPED RESEND: Reusing existing OTP for ${email}\n🔐 CURRENT CHROME OTP IS: ${existingOtpData.otp}\n=========================================\n`,
           );
         }
       }
@@ -531,10 +534,14 @@ router.post("/login-history", async (req, res) => {
           verified: false,
         });
 
+        console.log(
+          `\n=========================================\n🚨 NEW CHROME OTP GENERATED FOR ${email}\n🔐 OTP: ${otp}\n=========================================\n`,
+        );
+
         try {
           await sendOTPEmail(email, otp, language, "chrome_login");
           console.log(
-            `📧 Chrome OTP email sent to ${email} (Language: ${language})`,
+            `📧 Chrome OTP email sent successfully to ${email} (Language: ${language})`,
           );
         } catch (emailError) {
           console.error("Failed to send Chrome OTP email:", emailError);

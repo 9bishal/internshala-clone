@@ -221,17 +221,10 @@ export default function LoginHistory() {
                     <div className="flex items-start gap-4">
                       {getDeviceIcon(record.deviceInfo)}
                       <div>
-                        <div className="flex items-center gap-3">
-                          <h3 className="font-semibold text-gray-900 text-lg">
-                            {record.deviceInfo?.device || t('unknown_device')}
-                          </h3>
-                          {index === 0 && (
-                            <span className="bg-green-100 text-green-800 text-xs font-semibold px-2.5 py-0.5 rounded-full border border-green-200">
-                              {t('current_device')}
-                            </span>
-                          )}
-                        </div>
-                        <p className="text-gray-600 text-sm mt-0.5">
+                        <h3 className="font-semibold text-gray-900 text-lg">
+                          {record.deviceInfo?.device || t('unknown_device')}
+                        </h3>
+                        <p className="text-gray-600 text-sm">
                           {record.deviceInfo?.browser || t('unknown_browser')} •{" "}
                           {record.deviceInfo?.os || t('unknown_os')}
                         </p>

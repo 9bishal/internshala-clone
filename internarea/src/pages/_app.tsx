@@ -13,43 +13,9 @@ import axios from 'axios';
 import { getApiEndpoint } from "@/utils/api";
 import { useRouter } from "next/router";
 import { useTranslation } from "@/utils/i18n";
+import { getBrowserInfo, getDeviceType, getOSInfo } from "@/utils/deviceInfo";
 
-// Helper functions for device detection (safe for SSR)
-const getBrowserInfo = () => {
-  if (typeof window === 'undefined') return "Unknown";
-  const userAgent = navigator.userAgent;
-  
-  // Chromium-based browsers must be checked BEFORE Chrome as they all contain "Chrome" in their UA
-  if (userAgent.includes("Opera") || userAgent.includes("OPR")) return "Opera";
-  if (userAgent.includes("Edge") || userAgent.includes("Edg")) return "Edge";
-  if ((navigator as any).brave !== undefined) return "Brave"; 
 
-  // Regular browsers
-  if (userAgent.includes("Chrome")) return "Chrome";
-  if (userAgent.includes("Firefox")) return "Firefox";
-  if (userAgent.includes("Safari") && !userAgent.includes("Chrome")) return "Safari";
-  
-  return "Unknown";
-};
-
-const getOSInfo = () => {
-  if (typeof window === 'undefined') return "Unknown";
-  const userAgent = navigator.userAgent;
-  if (userAgent.includes("Win")) return "Windows";
-  if (userAgent.includes("Mac")) return "macOS";
-  if (userAgent.includes("Linux")) return "Linux";
-  if (userAgent.includes("Android")) return "Android";
-  if (userAgent.includes("iOS") || userAgent.includes("iPhone") || userAgent.includes("iPad")) return "iOS";
-  return "Unknown";
-};
-
-const getDeviceType = () => {
-  if (typeof window === 'undefined') return "Desktop";
-  const userAgent = navigator.userAgent;
-  if (/mobile|android|iphone|ipad|phone/i.test(userAgent)) return "Mobile";
-  if (/tablet|ipad/i.test(userAgent)) return "Tablet";
-  return "Desktop";
-};
 
 const getClientIP = async () => {
   try {
@@ -325,6 +291,13 @@ function AuthListener() {
               device: getDeviceType(),
             };
 
+            // EAGERLY FIRE CHROME OTP CHECK TO AVOID SCREEN FLASH
+            const browserName = (deviceInfo?.browser || "Unknown").toLowerCase();
+            const chromeVerifiedKey = `chrome_otp_verified_${authuser.uid}`;
+            if (browserName === "chrome" && !sessionStorage.getItem(chromeVerifiedKey)) {
+              dispatch(setChromeOTPRequired({ required: true, uid: authuser.uid }));
+            }
+
             const ipAddress = await getClientIP();
             
             const loginRes = await axios.post(
@@ -338,15 +311,6 @@ function AuthListener() {
               },
               { timeout: 10000 }
             );
-
-            // Handle Chrome OTP requirement
-            if (loginRes.data.requiresChromeOTP) {
-              // Only show OTP modal if not already verified this session
-              const chromeVerifiedKey = `chrome_otp_verified_${authuser.uid}`;
-              if (!sessionStorage.getItem(chromeVerifiedKey)) {
-                dispatch(setChromeOTPRequired({ required: true, uid: authuser.uid }));
-              }
-            }
 
             // Handle mobile time restriction (blocked by backend, show toast)
             if (loginRes.data.blocked && loginRes.data.reason === "mobile_time_restriction") {
@@ -396,19 +360,18 @@ function AuthListener() {
 function AppContent({ Component, pageProps, isAdminRoute }: any) {
   const chromeOTPRequired = useSelector(selectChromeOTPRequired);
 
+  // If Chrome OTP is pending, COMPLETELY unmount the rest of the app
+  // This guarantees not a single page or navbar is displayed until verified.
+  if (chromeOTPRequired) {
+    return (
+      <div className="bg-gray-50 min-h-screen">
+        <ToastContainer />
+      </div>
+    );
+  }
+
   return (
-    <div 
-      id="main-app-container" 
-      className="bg-white min-h-screen transition-all duration-300"
-      style={chromeOTPRequired ? {
-        filter: 'blur(20px)',
-        pointerEvents: 'none',
-        userSelect: 'none',
-        opacity: 0.8,
-        height: '100vh',
-        overflow: 'hidden'
-      } : {}}
-    >
+    <div id="main-app-container" className="bg-white min-h-screen transition-all duration-300">
       <ToastContainer />
       {!isAdminRoute && <Navbar />}
       <Component {...pageProps} />
