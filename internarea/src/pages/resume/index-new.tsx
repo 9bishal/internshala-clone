@@ -165,7 +165,7 @@ export default function ResumeBuilder() {
                   </div>
                   <div className="flex items-center text-sm text-gray-600">
                     <CreditCard className="w-4 h-4 text-blue-600 mr-2" />
-                    ₹50 per resume (one-time payment)
+                    ₹50 one-time payment for unlimited resumes
                   </div>
                 </div>
                 <button
@@ -189,7 +189,7 @@ export default function ResumeBuilder() {
                   Resume Creation Pricing
                 </h3>
                 <p className="text-gray-700 mb-3">
-                  Each resume creation costs <strong>₹50</strong> (one-time payment per resume).
+                  Resume creation unlocks permanently for <strong className="text-gray-900">₹50</strong> (a one-time payment for unlimited resumes).
                   This is in addition to your premium subscription.
                 </p>
                 <div className="space-y-2">

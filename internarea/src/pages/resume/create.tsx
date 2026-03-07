@@ -276,7 +276,7 @@ export default function CreateResume() {
             Create Your Professional Resume
           </h1>
           <p className="text-gray-600">
-            One-time payment of ₹50 per resume
+            One-time payment of ₹50 for unlimited access
           </p>
         </div>
 
@@ -502,7 +502,7 @@ export default function CreateResume() {
                   <div className="flex items-start">
                     <CheckCircle className="w-5 h-5 text-green-600 mr-3 flex-shrink-0 mt-0.5" />
                     <span className="text-sm text-gray-600">
-                      One-time payment per resume
+                      Single one-time lifetime payment
                     </span>
                   </div>
                   <div className="flex items-start">

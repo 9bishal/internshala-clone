@@ -463,13 +463,8 @@ router.post("/save-resume", async (req, res) => {
       subscription?.planId,
     );
 
-    if (!hasPremium && userData.hasPaidForResume) {
-      // Consume the ₹50 single-use payment
-      await db.collection("users").doc(uid).update({
-        hasPaidForResume: admin.firestore.FieldValue.delete(),
-      });
-    }
-
+    // As per user request: "just want one time."
+    // We no longer consume the hasPaidForResume flag, making it a true lifetime feature for ₹50.
     // Ensure it becomes default automatically
     await db.collection("users").doc(uid).update({
       resumeId: resumeRef.id,

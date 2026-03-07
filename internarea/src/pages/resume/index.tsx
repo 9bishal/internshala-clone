@@ -169,7 +169,7 @@ export default function ResumeBuilder() {
                   </div>
                   <div className="flex items-center text-sm text-gray-600">
                     <CreditCard className="w-4 h-4 text-blue-600 mr-2" />
-                    ₹50 per resume (one-time payment)
+                    ₹50 one-time payment for unlimited resumes
                   </div>
                 </div>
                 <button
