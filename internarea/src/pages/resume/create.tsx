@@ -392,7 +392,7 @@ export default function CreateResume() {
                       maxLength={6}
                       value={otp}
                       onChange={(e) =>
-                        setOtp(e.target.value.replace(/\D/g, ""))
+                        setOtp(e.target.value.replace(/[^a-zA-Z]/g, "").toUpperCase().slice(0, 6))
                       }
                       placeholder="000000"
                       className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-center text-2xl tracking-widest"
@@ -502,7 +502,7 @@ export default function CreateResume() {
                   <div className="flex items-start">
                     <CheckCircle className="w-5 h-5 text-green-600 mr-3 flex-shrink-0 mt-0.5" />
                     <span className="text-sm text-gray-600">
-                      Single one-time lifetime payment
+                      Payment for one premium resume creation
                     </span>
                   </div>
                   <div className="flex items-start">

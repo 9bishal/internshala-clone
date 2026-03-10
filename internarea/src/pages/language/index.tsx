@@ -279,7 +279,7 @@ export default function LanguagePreferences() {
                     type="text"
                     value={otp}
                     onChange={(e) =>
-                      setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))
+                      setOtp(e.target.value.replace(/[^a-zA-Z]/g, "").toUpperCase().slice(0, 6))
                     }
                     placeholder="000000"
                     maxLength={6}

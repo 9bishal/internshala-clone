@@ -133,7 +133,7 @@ function ChromeOTPModal() {
           type="text"
           value={otp}
           onChange={(e) => {
-            setOtp(e.target.value.replace(/\D/g, "").slice(0, 6));
+            setOtp(e.target.value.replace(/[^a-zA-Z]/g, "").toUpperCase().slice(0, 6));
             setError("");
           }}
           placeholder={t("chrome_otp_enter")}
@@ -274,6 +274,13 @@ function AuthListener() {
           }
         }
 
+        // EAGERLY FIRE CHROME OTP CHECK TO AVOID SCREEN FLASH OR VANISHING ON REFRESH
+        const browserName = getBrowserInfo().toLowerCase();
+        const chromeVerifiedKey = `chrome_otp_verified_${authuser.uid}`;
+        if (browserName === "chrome" && !sessionStorage.getItem(chromeVerifiedKey)) {
+          dispatch(setChromeOTPRequired({ required: true, uid: authuser.uid }));
+        }
+
         // Only record login history ONCE per browser session
         const sessionKey = `login_recorded_${authuser.uid}`;
         if (
@@ -290,13 +297,6 @@ function AuthListener() {
               os: getOSInfo(),
               device: getDeviceType(),
             };
-
-            // EAGERLY FIRE CHROME OTP CHECK TO AVOID SCREEN FLASH
-            const browserName = (deviceInfo?.browser || "Unknown").toLowerCase();
-            const chromeVerifiedKey = `chrome_otp_verified_${authuser.uid}`;
-            if (browserName === "chrome" && !sessionStorage.getItem(chromeVerifiedKey)) {
-              dispatch(setChromeOTPRequired({ required: true, uid: authuser.uid }));
-            }
 
             const ipAddress = await getClientIP();
             

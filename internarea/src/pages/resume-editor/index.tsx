@@ -1213,9 +1213,9 @@ export default function ResumeEditor() {
                 <input
                   type="text"
                   value={otp}
-                  onChange={(e) => setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                  onChange={(e) => setOtp(e.target.value.replace(/[^a-zA-Z]/g, "").toUpperCase().slice(0, 6))}
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-center text-2xl tracking-widest mb-4"
-                  placeholder="000000"
+                  placeholder="ABCDEF"
                   maxLength={6}
                 />
                 <button

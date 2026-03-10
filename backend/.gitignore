@@ -1,3 +1,20 @@
 node_modules/
 .env
 server.log
+
+# Test & Debug Scripts
+test-*.js
+test_*.js
+insert-*.js
+clear_*.js
+apply-*.js
+check-*.js
+delete-*.js
+fix-*.js
+list_*.js
+verify-*.js
+
+# Documentation / Config
+*.code-workspace
+RESUME_FIX_COMPLETE.md
+.DS_Store

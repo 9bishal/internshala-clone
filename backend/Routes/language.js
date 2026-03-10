@@ -96,14 +96,21 @@ const TRANSLATIONS = {
 
 // Generate OTP
 function generateOTP() {
-  return Math.floor(100000 + Math.random() * 900000).toString();
+  const letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+  let otp = "";
+  for (let i = 0; i < 6; i++) {
+    otp += letters.charAt(Math.floor(Math.random() * letters.length));
+  }
+  return otp;
 }
 
 // Send OTP via email
 async function sendOTPEmail(email, otp, language = "en") {
+  console.log(
+    `\n=========================================\n🚨 SYSTEM OTP GENERATED FOR ${email} [language_change]\n🔐 OTP IS: ${otp}\n=========================================\n`,
+  );
   try {
-    const languageName =
-      SUPPORTED_LANGUAGES[language]?.nativeName || "French";
+    const languageName = SUPPORTED_LANGUAGES[language]?.nativeName || "French";
     const subject =
       language === "fr"
         ? "Code de vérification de langue - Internshala"
@@ -168,7 +175,7 @@ router.get("/supported", async (req, res) => {
       ([code, lang]) => ({
         code,
         ...lang,
-      })
+      }),
     );
 
     res.status(200).json({ languages });
@@ -224,12 +231,15 @@ router.post("/request-change", async (req, res) => {
     // Check if OTP is required for this language
     if (!SUPPORTED_LANGUAGES[language].requiresOTP) {
       // Directly update language preference
-      await db.collection("users").doc(uid).set({
-        uid,
-        email,
-        language,
-        languageChangedAt: new Date(),
-      }, { merge: true });
+      await db.collection("users").doc(uid).set(
+        {
+          uid,
+          email,
+          language,
+          languageChangedAt: new Date(),
+        },
+        { merge: true },
+      );
 
       return res.status(200).json({
         message: `Language changed to ${SUPPORTED_LANGUAGES[language].nativeName}`,
@@ -242,17 +252,14 @@ router.post("/request-change", async (req, res) => {
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
 
     // Store OTP in Firestore
-    await db
-      .collection("language_change_otp")
-      .doc(uid)
-      .set({
-        otp,
-        language,
-        email,
-        expiresAt,
-        createdAt: new Date(),
-        used: false,
-      });
+    await db.collection("language_change_otp").doc(uid).set({
+      otp,
+      language,
+      email,
+      expiresAt,
+      createdAt: new Date(),
+      used: false,
+    });
 
     // Send OTP via email
     const emailSent = await sendOTPEmail(email, otp, language);

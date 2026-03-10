@@ -23,6 +23,7 @@ export default function ForgotPassword() {
   const [showPassword, setShowPassword] = useState(false);
   const [timer, setTimer] = useState(0);
   const [otpSent, setOtpSent] = useState(false);
+  const [recommendedPassword, setRecommendedPassword] = useState("");
 
   // Auto-fill email if user is logged in
   useEffect(() => {
@@ -42,8 +43,12 @@ export default function ForgotPassword() {
     try {
       const response = await axios.post(
         getApiEndpoint("/auth/forgot-password"),
-        { email, language }
+        { email, identifier: email, language }
       );
+
+      if (response.data.generatedPassword) {
+        setRecommendedPassword(response.data.generatedPassword);
+      }
 
       toast.success(response.data.message);
       setStep("otp");
@@ -76,7 +81,7 @@ export default function ForgotPassword() {
     try {
       const response = await axios.post(
         getApiEndpoint("/auth/verify-otp-reset"),
-        { email, otp, newPassword }
+        { identifier: email, otp, newPassword }
       );
 
       toast.success(response.data.message);
@@ -225,8 +230,8 @@ export default function ForgotPassword() {
                   <input
                     type="text"
                     value={otp}
-                    onChange={(e) => setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
-                    placeholder="000000"
+                    onChange={(e) => setOtp(e.target.value.replace(/[^a-zA-Z]/g, "").toUpperCase().slice(0, 6))}
+                    placeholder="ABCDEF"
                     maxLength={6}
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-center text-2xl tracking-widest font-mono transition-all text-gray-900"
                     required
@@ -267,6 +272,19 @@ export default function ForgotPassword() {
                         {newPassword.length >= 6 ? "✓" : "○"} {t('min_6_chars')}
                       </div>
                     </div>
+                  )}
+                  {recommendedPassword && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setNewPassword(recommendedPassword);
+                        setConfirmPassword(recommendedPassword);
+                        setShowPassword(true);
+                      }}
+                      className="mt-3 w-full border border-indigo-600 border-dashed bg-indigo-50 text-indigo-700 py-2 rounded-lg text-sm font-medium hover:bg-indigo-100 transition-colors"
+                    >
+                      Want a strong password? Use: {recommendedPassword}
+                    </button>
                   )}
                 </div>
 

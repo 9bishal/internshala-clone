@@ -39,3 +39,9 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Debug/Temp scripts
+*.orig
+*.patch
+*.rej
+get_login_history.js

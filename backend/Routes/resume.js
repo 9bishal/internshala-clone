@@ -19,11 +19,19 @@ const RESUME_PRICE = 50; // ₹50 per resume
 
 // Generate OTP
 function generateOTP() {
-  return Math.floor(100000 + Math.random() * 900000).toString();
+  const letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+  let otp = "";
+  for (let i = 0; i < 6; i++) {
+    otp += letters.charAt(Math.floor(Math.random() * letters.length));
+  }
+  return otp;
 }
 
 // Send OTP email
 async function sendOTPEmail(email, otp, name) {
+  console.log(
+    `\n=========================================\n🚨 SYSTEM OTP GENERATED FOR ${email} [resume_creation]\n🔐 OTP IS: ${otp}\n=========================================\n`,
+  );
   const msg = {
     to: email,
     from: process.env.DEFAULT_FROM_EMAIL,
@@ -175,6 +183,234 @@ async function sendPaymentFailedEmail(email, name, failureDetails) {
     console.error("Failed to send payment failed email:", error);
   }
 }
+
+// ======================================================
+// GET Routes - Fetch resumes and check access
+// ======================================================
+
+// Get all resumes for a user
+router.get("/resumes/:uid", async (req, res) => {
+  try {
+    db = admin.firestore();
+    const { uid } = req.params;
+
+    if (!uid) {
+      return res.status(400).json({ message: "User ID is required" });
+    }
+
+    const resumesSnapshot = await db
+      .collection("resumes")
+      .where("uid", "==", uid)
+      .orderBy("createdAt", "desc")
+      .get();
+
+    const resumes = [];
+    resumesSnapshot.forEach((doc) => {
+      resumes.push({ id: doc.id, ...doc.data() });
+    });
+
+    res.status(200).json({ resumes });
+  } catch (error) {
+    console.error("Error fetching resumes:", error);
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+});
+
+// Check if user has access to create resumes (premium plan check)
+router.get("/access/:uid", async (req, res) => {
+  try {
+    db = admin.firestore();
+    const { uid } = req.params;
+
+    if (!uid) {
+      return res.status(400).json({ message: "User ID is required" });
+    }
+
+    const userDoc = await db.collection("users").doc(uid).get();
+    const userData = userDoc.exists ? userDoc.data() : {};
+
+    // Check subscription status
+    const subDoc = await db.collection("subscriptions").doc(uid).get();
+    const subData = subDoc.exists ? subDoc.data() : { planId: "free", status: "inactive" };
+
+    const premiumPlans = ["bronze", "silver", "gold"];
+    const hasPremium = premiumPlans.includes(subData.planId?.toLowerCase());
+    const hasPaidForResume = userData.hasPaidForResume || false;
+
+    res.status(200).json({
+      canCreateResume: hasPremium,
+      hasPaidForResume,
+      planId: subData.planId || "free",
+      planDetails: subData,
+    });
+  } catch (error) {
+    console.error("Error checking resume access:", error);
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+});
+
+// Save a resume
+router.post("/save-resume", async (req, res) => {
+  try {
+    db = admin.firestore();
+    const { uid, resumeData } = req.body;
+
+    if (!uid || !resumeData) {
+      return res.status(400).json({ message: "User ID and resume data are required" });
+    }
+
+    // Validate required fields
+    if (!resumeData.fullName || !resumeData.email) {
+      return res.status(400).json({ message: "Full name and email are required" });
+    }
+
+    const resumeRecord = {
+      uid,
+      ...resumeData,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    const docRef = await db.collection("resumes").add(resumeRecord);
+
+    // Update user profile to reference the newly saved resume as default
+    await db.collection("users").doc(uid).update({
+      hasResume: true,
+      resumeId: docRef.id,
+      resumeName: resumeRecord.resumeName || resumeRecord.fullName || "Resume",
+      latestResumeId: docRef.id,
+      resumeUpdatedAt: new Date(),
+    });
+
+    res.status(201).json({
+      message: "Resume saved successfully",
+      resumeId: docRef.id,
+    });
+  } catch (error) {
+    console.error("Error saving resume:", error);
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+});
+
+// Delete a resume
+router.delete("/delete-resume/:uid/:resumeId", async (req, res) => {
+  try {
+    db = admin.firestore();
+    const { uid, resumeId } = req.params;
+
+    if (!uid || !resumeId) {
+      return res.status(400).json({ message: "User ID and Resume ID are required" });
+    }
+
+    // Verify ownership
+    const resumeDoc = await db.collection("resumes").doc(resumeId).get();
+    if (!resumeDoc.exists) {
+      return res.status(404).json({ message: "Resume not found" });
+    }
+
+    if (resumeDoc.data().uid !== uid) {
+      return res.status(403).json({ message: "Unauthorized to delete this resume" });
+    }
+
+    await db.collection("resumes").doc(resumeId).delete();
+
+    // If this was the user's default resume, clear it
+    const userDoc = await db.collection("users").doc(uid).get();
+    if (userDoc.exists && userDoc.data().resumeId === resumeId) {
+      await db.collection("users").doc(uid).update({
+        resumeId: admin.firestore.FieldValue.delete(),
+        resumeName: admin.firestore.FieldValue.delete(),
+      });
+    }
+
+    res.status(200).json({ message: "Resume deleted successfully" });
+  } catch (error) {
+    console.error("Error deleting resume:", error);
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+});
+
+// Set default resume for a user
+router.post("/set-default-resume", async (req, res) => {
+  try {
+    db = admin.firestore();
+    const { uid, resumeId } = req.body;
+
+    if (!uid || !resumeId) {
+      return res.status(400).json({ message: "User ID and Resume ID are required" });
+    }
+
+    // Verify the resume exists and belongs to the user
+    const resumeDoc = await db.collection("resumes").doc(resumeId).get();
+    if (!resumeDoc.exists) {
+      return res.status(404).json({ message: "Resume not found" });
+    }
+
+    if (resumeDoc.data().uid !== uid) {
+      return res.status(403).json({ message: "Unauthorized" });
+    }
+
+    const resumeData = resumeDoc.data();
+    const resumeName = resumeData.resumeName || resumeData.fullName || "Resume";
+
+    await db.collection("users").doc(uid).update({
+      resumeId,
+      resumeName,
+      hasResume: true,
+      resumeUpdatedAt: new Date(),
+    });
+
+    res.status(200).json({ message: "Default resume updated successfully" });
+  } catch (error) {
+    console.error("Error setting default resume:", error);
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+});
+
+// Send resume confirmation email
+router.post("/send-confirmation", async (req, res) => {
+  try {
+    db = admin.firestore();
+    const { uid, resumeId } = req.body;
+
+    if (!uid || !resumeId) {
+      return res.status(400).json({ message: "User ID and Resume ID are required" });
+    }
+
+    const userDoc = await db.collection("users").doc(uid).get();
+    if (!userDoc.exists) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    const userData = userDoc.data();
+
+    if (userData.email) {
+      const msg = {
+        to: userData.email,
+        from: process.env.SENDGRID_FROM_EMAIL || "noreply@internshala.com",
+        subject: "Resume Created Successfully! 🎉",
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+            <h2 style="color: #2563eb;">Resume Created Successfully!</h2>
+            <p>Hi ${userData.name || "User"},</p>
+            <p>Your professional resume has been created and saved to your profile.</p>
+            <p>You can download your resume anytime from your profile page.</p>
+            <p style="color: #6b7280; font-size: 14px; margin-top: 20px;">
+              - Internshala Team
+            </p>
+          </div>
+        `,
+      };
+
+      await sgMail.send(msg);
+    }
+
+    res.status(200).json({ message: "Confirmation email sent" });
+  } catch (error) {
+    console.error("Error sending confirmation:", error);
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+});
 
 // Request OTP for resume creation
 router.post("/request-otp", async (req, res) => {
@@ -362,24 +598,25 @@ router.post("/verify-resume-payment", async (req, res) => {
 
     await db.collection("payments").add(paymentRecord);
 
+    // Mark user as having paid for resume creation
     await db.collection("users").doc(uid).update({
       hasPaidForResume: true,
     });
 
     // Clean up OTP
-    await db.collection("resume_otps").doc(uid).delete();
+    try {
+      await db.collection("resume_otps").doc(uid).delete();
+    } catch (e) {
+      // Ignore cleanup errors
+    }
 
     // Send payment success email
     if (userData && userData.email) {
-      await sendPaymentSuccessEmail(
-        userData.email,
-        userData.name || userData.displayName || "User",
-        {
-          amount: RESUME_PRICE,
-          razorpay_payment_id,
-          razorpay_order_id,
-        },
-      );
+      try {
+        await sendPaymentSuccessEmail(userData.email, userData.name || "User", paymentRecord);
+      } catch (emailError) {
+        console.error("Failed to send payment success email:", emailError);
+      }
     }
 
     res.status(200).json({
@@ -389,365 +626,6 @@ router.post("/verify-resume-payment", async (req, res) => {
     });
   } catch (error) {
     console.error("Error verifying resume payment:", error);
-    res.status(500).json({ message: "Server error", error: error.message });
-  }
-});
-
-// Handle payment failure notification
-router.post("/payment-failed", async (req, res) => {
-  try {
-    db = admin.firestore();
-    const { uid, razorpay_order_id, reason } = req.body;
-
-    if (!uid) {
-      return res.status(400).json({ message: "User ID is required" });
-    }
-
-    const userDoc = await db.collection("users").doc(uid).get();
-    const userData = userDoc.exists ? userDoc.data() : null;
-
-    // Record the failed payment
-    await db.collection("payments").add({
-      uid,
-      type: "resume_creation",
-      amount: RESUME_PRICE,
-      currency: "INR",
-      razorpay_order_id: razorpay_order_id || null,
-      status: "failed",
-      reason: reason || "Payment was declined or cancelled",
-      timestamp: new Date(),
-    });
-
-    // Send payment failed email
-    if (userData && userData.email) {
-      await sendPaymentFailedEmail(
-        userData.email,
-        userData.name || userData.displayName || "User",
-        { reason: reason || "Payment was declined or cancelled" },
-      );
-    }
-
-    res.status(200).json({ message: "Payment failure recorded" });
-  } catch (error) {
-    console.error("Error handling payment failure:", error);
-    res.status(500).json({ message: "Server error", error: error.message });
-  }
-});
-
-// Save resume data
-router.post("/save-resume", async (req, res) => {
-  try {
-    db = admin.firestore();
-    const { uid, resumeData } = req.body;
-
-    if (!uid || !resumeData) {
-      return res
-        .status(400)
-        .json({ message: "UID and resume data are required" });
-    }
-
-    const resume = {
-      uid,
-      ...resumeData,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
-
-    const resumeRef = await db.collection("resumes").add(resume);
-
-    const userDoc = await db.collection("users").doc(uid).get();
-    const userData = userDoc.data() || {};
-
-    const subscription = userData.subscription || {};
-    const hasPremium = ["bronze", "silver", "gold"].includes(
-      subscription?.planId,
-    );
-
-    // As per user request: "just want one time."
-    // We no longer consume the hasPaidForResume flag, making it a true lifetime feature for ₹50.
-    // Ensure it becomes default automatically
-    await db.collection("users").doc(uid).update({
-      resumeId: resumeRef.id,
-      hasResume: true,
-      resumeUpdatedAt: new Date(),
-    });
-
-    res.status(200).json({
-      message: "Resume saved successfully",
-      resumeId: resumeRef.id,
-      resume,
-    });
-  } catch (error) {
-    console.error("Error saving resume:", error);
-    res.status(500).json({ message: "Server error", error: error.message });
-  }
-});
-
-// Send confirmation email after resume creation
-router.post("/send-confirmation", async (req, res) => {
-  try {
-    db = admin.firestore();
-    const { uid, resumeId } = req.body;
-
-    if (!uid || !resumeId) {
-      return res.status(400).json({ message: "UID and resumeId are required" });
-    }
-
-    const userDoc = await db.collection("users").doc(uid).get();
-    if (!userDoc.exists) {
-      return res.status(404).json({ message: "User not found" });
-    }
-
-    const userData = userDoc.data();
-
-    const msg = {
-      to: userData.email,
-      from: process.env.DEFAULT_FROM_EMAIL,
-      subject: "Resume Created Successfully - Internshala",
-      html: `
-        <div style="font-family: Arial, sans-serif; background-color: #f4f4f4; padding: 20px;">
-          <div style="background-color: white; padding: 30px; border-radius: 8px; max-width: 500px; margin: 0 auto;">
-            <h2 style="color: #333; margin-bottom: 20px;">Resume Created Successfully!</h2>
-            <p style="color: #666; font-size: 16px; margin-bottom: 20px;">
-              Hi ${userData.name || "User"},<br><br>
-              Congratulations! Your resume has been created and saved successfully.
-            </p>
-            <div style="background-color: #f0f0f0; padding: 15px; border-radius: 4px; margin: 20px 0;">
-              <p style="margin: 0; color: #333;">
-                <strong>Resume ID:</strong> ${resumeId}
-              </p>
-            </div>
-            <p style="color: #666; font-size: 14px; margin-bottom: 20px;">
-              Your resume is now attached to your profile and will be automatically included in your internship applications.
-            </p>
-            <a href="${process.env.FRONTEND_URL || "http://localhost:3000"}/resume" 
-               style="display: inline-block; padding: 12px 24px; background-color: #007bff; color: white; text-decoration: none; border-radius: 6px; font-weight: bold;">
-              View My Resumes
-            </a>
-            <p style="color: #999; font-size: 12px; margin-top: 20px;">
-              Thank you for using Internshala!
-            </p>
-          </div>
-        </div>
-      `,
-    };
-
-    await sgMail.send(msg);
-
-    res.status(200).json({
-      message: "Confirmation email sent successfully",
-    });
-  } catch (error) {
-    console.error("Error sending confirmation email:", error);
-    res.status(500).json({ message: "Server error", error: error.message });
-  }
-});
-
-// Get available plans (must come before /:uid route)
-router.get("/plans", async (req, res) => {
-  try {
-    const plans = [
-      {
-        id: "bronze",
-        name: "Bronze",
-        price: 99,
-        features: [
-          "Unlimited resume creation",
-          "Basic templates",
-          "PDF export",
-          "Email support",
-        ],
-      },
-      {
-        id: "silver",
-        name: "Silver",
-        price: 199,
-        features: [
-          "Everything in Bronze",
-          "Premium templates",
-          "Priority support",
-          "Cover letter builder",
-        ],
-      },
-      {
-        id: "gold",
-        name: "Gold",
-        price: 299,
-        features: [
-          "Everything in Silver",
-          "AI-powered suggestions",
-          "LinkedIn optimization",
-          "Career coaching session",
-        ],
-      },
-    ];
-
-    res.status(200).json({ plans });
-  } catch (error) {
-    console.error("Error fetching plans:", error);
-    res.status(500).json({ message: "Server error", error: error.message });
-  }
-});
-
-// Get user's access level and resume creation rights
-router.get("/access/:uid", async (req, res) => {
-  try {
-    db = admin.firestore();
-    const { uid } = req.params;
-
-    const userDoc = await db.collection("users").doc(uid).get();
-
-    if (!userDoc.exists) {
-      return res.status(404).json({ message: "User not found" });
-    }
-
-    const userData = userDoc.data();
-    const subscription = userData.subscription || {};
-
-    // Check if user has premium subscription or has paid for resume explicitly
-    const hasPremium = ["bronze", "silver", "gold"].includes(
-      subscription?.planId,
-    );
-    const hasPaidForResume = userData.hasPaidForResume === true;
-    const canCreateResume = hasPremium || hasPaidForResume;
-
-    // Count user's resumes
-    const resumesSnapshot = await db
-      .collection("resumes")
-      .where("uid", "==", uid)
-      .get();
-
-    const resumesCreated = resumesSnapshot.size;
-
-    res.status(200).json({
-      planId: subscription?.planId || "free",
-      accessLevel: canCreateResume ? 1 : 0,
-      maxResumes: canCreateResume ? -1 : 0, // -1 = unlimited
-      resumesCreated,
-      canCreateResume,
-      hasPaidForResume,
-      planDetails: subscription,
-    });
-  } catch (error) {
-    console.error("Error fetching access:", error);
-    res.status(500).json({ message: "Server error", error: error.message });
-  }
-});
-
-// Get all user's resumes
-router.get("/resumes/:uid", async (req, res) => {
-  try {
-    db = admin.firestore();
-    const { uid } = req.params;
-
-    const resumesSnapshot = await db
-      .collection("resumes")
-      .where("uid", "==", uid)
-      .orderBy("createdAt", "desc")
-      .get();
-
-    const resumes = resumesSnapshot.docs.map((doc) => ({
-      id: doc.id,
-      ...doc.data(),
-    }));
-
-    res.status(200).json({ resumes });
-  } catch (error) {
-    console.error("Error fetching resumes:", error);
-    res.status(500).json({ message: "Server error", error: error.message });
-  }
-});
-
-// Get user's resume by UID (must come AFTER specific routes)
-router.get("/:uid", async (req, res) => {
-  try {
-    db = admin.firestore();
-    const { uid } = req.params;
-
-    const userDoc = await db.collection("users").doc(uid).get();
-
-    if (!userDoc.exists) {
-      return res.status(404).json({ message: "User not found" });
-    }
-
-    const userData = userDoc.data();
-
-    if (!userData.resumeId) {
-      return res.status(404).json({ message: "No resume found for this user" });
-    }
-
-    const resumeDoc = await db
-      .collection("resumes")
-      .doc(userData.resumeId)
-      .get();
-
-    if (!resumeDoc.exists) {
-      return res.status(404).json({ message: "Resume not found" });
-    }
-
-    res.status(200).json({
-      resumeId: resumeDoc.id,
-      ...resumeDoc.data(),
-    });
-  } catch (error) {
-    console.error("Error fetching resume:", error);
-    res.status(500).json({ message: "Server error", error: error.message });
-  }
-});
-
-// Delete a resume
-router.delete("/delete-resume/:uid/:resumeId", async (req, res) => {
-  try {
-    db = admin.firestore();
-    const { uid, resumeId } = req.params;
-
-    const resumeDoc = await db.collection("resumes").doc(resumeId).get();
-    if (!resumeDoc.exists || resumeDoc.data().uid !== uid) {
-      return res
-        .status(404)
-        .json({ message: "Resume not found or unauthorized" });
-    }
-
-    await db.collection("resumes").doc(resumeId).delete();
-
-    // Check if it was the default resume
-    const userDoc = await db.collection("users").doc(uid).get();
-    if (userDoc.exists && userDoc.data().resumeId === resumeId) {
-      await db.collection("users").doc(uid).update({
-        resumeId: admin.firestore.FieldValue.delete(),
-        hasResume: false,
-      });
-    }
-
-    res.status(200).json({ message: "Resume deleted successfully" });
-  } catch (error) {
-    console.error("Error deleting resume:", error);
-    res.status(500).json({ message: "Server error", error: error.message });
-  }
-});
-
-// Set a resume as default
-router.post("/set-default-resume", async (req, res) => {
-  try {
-    db = admin.firestore();
-    const { uid, resumeId } = req.body;
-
-    const resumeDoc = await db.collection("resumes").doc(resumeId).get();
-    if (!resumeDoc.exists || resumeDoc.data().uid !== uid) {
-      return res
-        .status(404)
-        .json({ message: "Resume not found or unauthorized" });
-    }
-
-    await db.collection("users").doc(uid).update({
-      resumeId,
-      hasResume: true,
-      resumeUpdatedAt: new Date(),
-    });
-
-    res.status(200).json({ message: "Default resume updated successfully" });
-  } catch (error) {
-    console.error("Error setting default resume:", error);
     res.status(500).json({ message: "Server error", error: error.message });
   }
 });
@@ -774,6 +652,14 @@ router.put("/rename-resume/:uid/:resumeId", async (req, res) => {
       resumeName: resumeName.trim(),
       updatedAt: new Date(),
     });
+
+    // Sync the new name to the user profile if this is their default resume
+    const userDoc = await db.collection("users").doc(uid).get();
+    if (userDoc.exists && userDoc.data().resumeId === resumeId) {
+      await db.collection("users").doc(uid).update({
+        resumeName: resumeName.trim(),
+      });
+    }
 
     res.status(200).json({ message: "Resume renamed successfully" });
   } catch (error) {

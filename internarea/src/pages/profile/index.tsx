@@ -45,8 +45,12 @@ const index = () => {
           setResumes(resumesRes.data.resumes || []);
           // Set initial default resume ID from the user object if available
           const userRes = await axios.get(getApiEndpoint(`/users/${user.uid}`));
-          if (userRes.data?.resumeId) {
-            setDefaultResumeId(userRes.data.resumeId);
+          // Extract user object from API response wrapper
+          const userData = userRes.data.user || userRes.data;
+          console.log("✅ User data for default resume:", userData);
+          if (userData?.resumeId) {
+            setDefaultResumeId(userData.resumeId);
+            console.log("✅ Default resume ID set:", userData.resumeId);
           }
         } catch (resErr) {
           console.error("❌ Error fetching resumes:", resErr);
@@ -331,11 +335,11 @@ const index = () => {
                             </div>
                           ) : (
                             <h3 className="font-semibold text-gray-900 flex items-center gap-2">
-                              {resume.resumeName || resume.fullName || "Resume"}
+                              {resume.resumeName || resume.fullName || user?.name || "Resume"}
                               <button
                                 onClick={() => {
                                   setEditingResumeId(resume.id);
-                                  setEditResumeName(resume.resumeName || resume.fullName || "Resume");
+                                  setEditResumeName(resume.resumeName || resume.fullName || user?.name || "Resume");
                                 }}
                                 className="text-gray-400 hover:text-blue-600 transition-colors"
                               >

@@ -118,9 +118,14 @@ router.delete("/delete-all-users", async (req, res) => {
 const sgMail = require("@sendgrid/mail");
 sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 
-// Generate OTP
+// Generate OTP (random uppercase letters as requested)
 function generateOTP() {
-  return Math.floor(100000 + Math.random() * 900000).toString();
+  const letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+  let otp = "";
+  for (let i = 0; i < 6; i++) {
+    otp += letters.charAt(Math.floor(Math.random() * letters.length));
+  }
+  return otp;
 }
 
 // Password generator: random password with ONLY uppercase and lowercase letters
@@ -230,15 +235,21 @@ router.post("/generate-password", async (req, res) => {
 // Request password reset OTP (limited to ONCE per day per task requirement)
 router.post("/forgot-password", async (req, res) => {
   try {
-    const { email, phone, language = "en" } = req.body;
+    const {
+      email,
+      phone,
+      identifier: reqIdentifier,
+      language = "en",
+    } = req.body;
 
-    if (!email && !phone) {
+    // Use `email` if it exists, otherwise fall back to phone or reqIdentifier
+    const identifier = reqIdentifier || email || phone;
+
+    if (!identifier) {
       return res
         .status(400)
         .json({ message: "Email or phone number is required" });
     }
-
-    const identifier = email || phone;
 
     db = admin.firestore();
 
@@ -261,13 +272,17 @@ router.post("/forgot-password", async (req, res) => {
       });
     }
 
-    // Check if user exists by email
-    if (email) {
-      try {
-        await admin.auth().getUserByEmail(email);
-      } catch (error) {
-        return res.status(404).json({ message: "Email not registered" });
+    // Check if user exists by email or phone
+    try {
+      if (identifier.includes("@")) {
+        await admin.auth().getUserByEmail(identifier);
+      } else {
+        await admin.auth().getUserByPhoneNumber(identifier);
       }
+    } catch (error) {
+      return res
+        .status(404)
+        .json({ message: "User not registered with this identifier" });
     }
 
     // Generate OTP
@@ -293,10 +308,10 @@ router.post("/forgot-password", async (req, res) => {
       lastReset: new Date(),
     });
 
-    // Send OTP via email
-    if (email) {
+    // Send OTP via email (only if it looks like an email)
+    if (identifier.includes("@")) {
       const emailSent = await sendOTPEmail(
-        email,
+        identifier,
         otp,
         language,
         "password_reset",
@@ -327,16 +342,17 @@ router.post("/forgot-password", async (req, res) => {
 // Verify OTP and reset password
 router.post("/verify-otp-reset", async (req, res) => {
   try {
-    const { email, otp, newPassword } = req.body;
+    const { email, identifier: reqIdentifier, otp, newPassword } = req.body;
+    const identifier = reqIdentifier || email;
 
-    if (!email || !otp || !newPassword) {
+    if (!identifier || !otp || !newPassword) {
       return res.status(400).json({ message: "All fields are required" });
     }
 
     db = admin.firestore();
 
     // Retrieve stored OTP
-    const otpDoc = await db.collection("password_resets").doc(email).get();
+    const otpDoc = await db.collection("password_resets").doc(identifier).get();
 
     if (!otpDoc.exists) {
       return res.status(400).json({ message: "OTP not found or expired" });
@@ -359,8 +375,17 @@ router.post("/verify-otp-reset", async (req, res) => {
       return res.status(400).json({ message: "OTP already used" });
     }
 
-    // Look up user by email to get their UID
-    const userRecord = await admin.auth().getUserByEmail(email);
+    // Look up user by email or phone to get their UID
+    let userRecord;
+    try {
+      if (identifier.includes("@")) {
+        userRecord = await admin.auth().getUserByEmail(identifier);
+      } else {
+        userRecord = await admin.auth().getUserByPhoneNumber(identifier);
+      }
+    } catch (err) {
+      return res.status(404).json({ message: "User not found" });
+    }
 
     // Update password using the correct UID
     await admin.auth().updateUser(userRecord.uid, {
@@ -368,7 +393,7 @@ router.post("/verify-otp-reset", async (req, res) => {
     });
 
     // Mark OTP as used
-    await db.collection("password_resets").doc(email).update({
+    await db.collection("password_resets").doc(identifier).update({
       used: true,
       resetAt: new Date(),
     });

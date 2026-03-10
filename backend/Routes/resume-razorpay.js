@@ -7,12 +7,27 @@ const sgMail = require("@sendgrid/mail");
 const emailTemplates = require("../utils/emailTemplates");
 
 // Log configuration on module load
-console.log('🚀 [Resume-Razorpay] Module loaded');
-console.log('📧 [Resume-Razorpay] SendGrid API Key configured:', process.env.SENDGRID_API_KEY ? 'Yes ✅' : 'No ❌');
-console.log('📧 [Resume-Razorpay] Default From Email:', process.env.DEFAULT_FROM_EMAIL || 'Not configured ❌');
-console.log('💳 [Resume-Razorpay] Razorpay Key ID:', process.env.RAZORPAY_KEY_ID ? 'Yes ✅' : 'No ❌');
-console.log('🔐 [Resume-Razorpay] Razorpay Key Secret:', process.env.RAZORPAY_KEY_SECRET ? 'Yes ✅' : 'No ❌');
-console.log('🌐 [Resume-Razorpay] Site URL:', process.env.SITE_URL || 'Not configured');
+console.log("🚀 [Resume-Razorpay] Module loaded");
+console.log(
+  "📧 [Resume-Razorpay] SendGrid API Key configured:",
+  process.env.SENDGRID_API_KEY ? "Yes ✅" : "No ❌",
+);
+console.log(
+  "📧 [Resume-Razorpay] Default From Email:",
+  process.env.DEFAULT_FROM_EMAIL || "Not configured ❌",
+);
+console.log(
+  "💳 [Resume-Razorpay] Razorpay Key ID:",
+  process.env.RAZORPAY_KEY_ID ? "Yes ✅" : "No ❌",
+);
+console.log(
+  "🔐 [Resume-Razorpay] Razorpay Key Secret:",
+  process.env.RAZORPAY_KEY_SECRET ? "Yes ✅" : "No ❌",
+);
+console.log(
+  "🌐 [Resume-Razorpay] Site URL:",
+  process.env.SITE_URL || "Not configured",
+);
 
 sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 
@@ -28,12 +43,19 @@ const RESUME_PRICE = 50; // ₹50 per resume
 
 // Generate OTP
 function generateOTP() {
-  return Math.floor(100000 + Math.random() * 900000).toString();
+  const letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+  let otp = "";
+  for (let i = 0; i < 6; i++) {
+    otp += letters.charAt(Math.floor(Math.random() * letters.length));
+  }
+  return otp;
 }
 
 // Send OTP email
 async function sendOTPEmail(email, otp, name, language = "en") {
-  console.log(`📧 [OTP Email] Preparing to send OTP to: ${email} (Language: ${language})`);
+  console.log(
+    `📧 [OTP Email] Preparing to send OTP to: ${email} (Language: ${language})`,
+  );
   const templates = emailTemplates[language] || emailTemplates["en"];
 
   const msg = {
@@ -60,16 +82,21 @@ async function sendOTPEmail(email, otp, name, language = "en") {
   };
 
   console.log(`📧 [OTP Email] Sending email via SendGrid...`);
-  
+
   try {
     const result = await sgMail.send(msg);
     console.log(`✅ [OTP Email] Email sent successfully!`);
-    console.log(`✅ [OTP Email] SendGrid response status: ${result[0]?.statusCode}`);
+    console.log(
+      `✅ [OTP Email] SendGrid response status: ${result[0]?.statusCode}`,
+    );
     return result;
   } catch (error) {
-    console.error('❌ [OTP Email] Failed to send email:', error);
+    console.error("❌ [OTP Email] Failed to send email:", error);
     if (error.response) {
-      console.error('❌ [OTP Email] SendGrid error response:', error.response.body);
+      console.error(
+        "❌ [OTP Email] SendGrid error response:",
+        error.response.body,
+      );
     }
     throw error;
   }
@@ -78,14 +105,14 @@ async function sendOTPEmail(email, otp, name, language = "en") {
 // Request OTP for resume creation
 router.post("/request-otp", async (req, res) => {
   try {
-    console.log('🔐 [Request OTP] Starting OTP request process...');
+    console.log("🔐 [Request OTP] Starting OTP request process...");
     db = admin.firestore();
     const { uid, language = "en" } = req.body;
 
     console.log(`🔐 [Request OTP] UID: ${uid}`);
 
     if (!uid) {
-      console.warn('⚠️ [Request OTP] No UID provided');
+      console.warn("⚠️ [Request OTP] No UID provided");
       return res.status(400).json({ message: "UID is required" });
     }
 
@@ -98,20 +125,39 @@ router.post("/request-otp", async (req, res) => {
     }
 
     const userData = userDoc.data();
-    console.log(`✅ [Request OTP] User found: ${userData.name || userData.email}`);
+    console.log(
+      `✅ [Request OTP] User found: ${userData.name || userData.email}`,
+    );
     console.log(`📧 [Request OTP] User email: ${userData.email}`);
-    console.log(`📦 [Request OTP] User subscription plan: ${userData.subscription?.planId || 'none'}`);
+    console.log(
+      `📦 [Request OTP] User subscription plan: ${userData.subscription?.planId || "none"}`,
+    );
 
     if (!userData.email) {
-      console.error('❌ [Request OTP] User has no email address!');
-      return res.status(400).json({ 
-        message: "User email not found. Please update your profile with a valid email address.",
-        missingEmail: true
+      console.error("❌ [Request OTP] User has no email address!");
+      return res.status(400).json({
+        message:
+          "User email not found. Please update your profile with a valid email address.",
+        missingEmail: true,
       });
     }
 
-    // Removed: Premium only check. Anyone can pay the 50rs. and create a resume!
+    // Premium only check: Ensure user is on a premium plan before allowing resume creation
+    const subscription = userData.subscription || {};
+    const hasPremium = ["bronze", "silver", "gold"].includes(
+      subscription.planId,
+    );
 
+    if (!hasPremium) {
+      console.warn(
+        `⚠️ [Request OTP] User ${uid} attempted to create a resume without a premium plan.`,
+      );
+      return res.status(403).json({
+        message:
+          "Resume creation is a premium feature. Please upgrade your plan.",
+        requiresPremium: true,
+      });
+    }
     // Generate OTP
     const otp = generateOTP();
     const otpExpiry = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
@@ -121,20 +167,19 @@ router.post("/request-otp", async (req, res) => {
 
     // Store OTP in database
     console.log(`💾 [Request OTP] Storing OTP in Firestore...`);
-    await db
-      .collection("resume_otps")
-      .doc(uid)
-      .set({
-        otp,
-        expiresAt: otpExpiry,
-        createdAt: new Date(),
-        verified: false,
-      });
+    await db.collection("resume_otps").doc(uid).set({
+      otp,
+      expiresAt: otpExpiry,
+      createdAt: new Date(),
+      verified: false,
+    });
 
     console.log(`✅ [Request OTP] OTP stored in database`);
 
     // Send OTP email
-    console.log(`📧 [Request OTP] Attempting to send OTP email in ${language}...`);
+    console.log(
+      `📧 [Request OTP] Attempting to send OTP email in ${language}...`,
+    );
     await sendOTPEmail(userData.email, otp, userData.name || "User", language);
 
     console.log(`✅ [Request OTP] OTP process completed successfully`);
@@ -145,18 +190,18 @@ router.post("/request-otp", async (req, res) => {
   } catch (error) {
     console.error("❌ [Request OTP] Error:", error);
     console.error("❌ [Request OTP] Error stack:", error.stack);
-    
+
     // Provide more specific error messages
     let errorMessage = "Failed to send OTP";
-    if (error.message?.includes('SendGrid')) {
+    if (error.message?.includes("SendGrid")) {
       errorMessage = "Email service error. Please contact support.";
-    } else if (error.message?.includes('email')) {
+    } else if (error.message?.includes("email")) {
       errorMessage = error.message;
     }
-    
-    res.status(500).json({ 
+
+    res.status(500).json({
       message: errorMessage,
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      error: process.env.NODE_ENV === "development" ? error.message : undefined,
     });
   }
 });
@@ -164,7 +209,7 @@ router.post("/request-otp", async (req, res) => {
 // Verify OTP
 router.post("/verify-otp", async (req, res) => {
   try {
-    console.log('🔐 [Verify OTP] Starting OTP verification...');
+    console.log("🔐 [Verify OTP] Starting OTP verification...");
     db = admin.firestore();
     const { uid, otp } = req.body;
 
@@ -172,7 +217,7 @@ router.post("/verify-otp", async (req, res) => {
     console.log(`🔐 [Verify OTP] OTP received: ${otp}`);
 
     if (!uid || !otp) {
-      console.warn('⚠️ [Verify OTP] Missing UID or OTP');
+      console.warn("⚠️ [Verify OTP] Missing UID or OTP");
       return res.status(400).json({ message: "UID and OTP are required" });
     }
 
@@ -181,26 +226,36 @@ router.post("/verify-otp", async (req, res) => {
 
     if (!otpDoc.exists) {
       console.warn(`⚠️ [Verify OTP] No OTP found for UID: ${uid}`);
-      return res.status(400).json({ message: "No OTP found. Please request a new one." });
+      return res
+        .status(400)
+        .json({ message: "No OTP found. Please request a new one." });
     }
 
     const otpData = otpDoc.data();
     console.log(`✅ [Verify OTP] OTP document found`);
     console.log(`🔐 [Verify OTP] Stored OTP: ${otpData.otp}`);
-    console.log(`⏰ [Verify OTP] Expires at: ${otpData.expiresAt.toDate().toISOString()}`);
+    console.log(
+      `⏰ [Verify OTP] Expires at: ${otpData.expiresAt.toDate().toISOString()}`,
+    );
     console.log(`⏰ [Verify OTP] Current time: ${new Date().toISOString()}`);
 
     // Check if OTP has expired
     if (new Date() > otpData.expiresAt.toDate()) {
       console.warn(`⚠️ [Verify OTP] OTP expired for UID: ${uid}`);
       await db.collection("resume_otps").doc(uid).delete();
-      return res.status(400).json({ message: "OTP has expired. Please request a new one." });
+      return res
+        .status(400)
+        .json({ message: "OTP has expired. Please request a new one." });
     }
 
     // Verify OTP
     if (otpData.otp !== otp) {
-      console.warn(`⚠️ [Verify OTP] Invalid OTP. Expected: ${otpData.otp}, Got: ${otp}`);
-      return res.status(400).json({ message: "Invalid OTP. Please try again." });
+      console.warn(
+        `⚠️ [Verify OTP] Invalid OTP. Expected: ${otpData.otp}, Got: ${otp}`,
+      );
+      return res
+        .status(400)
+        .json({ message: "Invalid OTP. Please try again." });
     }
 
     console.log(`✅ [Verify OTP] OTP verified successfully`);
@@ -220,9 +275,9 @@ router.post("/verify-otp", async (req, res) => {
   } catch (error) {
     console.error("❌ [Verify OTP] Error:", error);
     console.error("❌ [Verify OTP] Error stack:", error.stack);
-    res.status(500).json({ 
+    res.status(500).json({
       message: "Failed to verify OTP",
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      error: process.env.NODE_ENV === "development" ? error.message : undefined,
     });
   }
 });
@@ -276,12 +331,8 @@ router.post("/create-resume-order", async (req, res) => {
 router.post("/verify-resume-payment", async (req, res) => {
   try {
     db = admin.firestore();
-    const {
-      uid,
-      razorpay_order_id,
-      razorpay_payment_id,
-      razorpay_signature,
-    } = req.body;
+    const { uid, razorpay_order_id, razorpay_payment_id, razorpay_signature } =
+      req.body;
 
     if (
       !uid ||
@@ -346,7 +397,9 @@ router.post("/save-resume", async (req, res) => {
     const { uid, resumeData } = req.body;
 
     if (!uid || !resumeData) {
-      return res.status(400).json({ message: "UID and resume data are required" });
+      return res
+        .status(400)
+        .json({ message: "UID and resume data are required" });
     }
 
     const resume = {
@@ -359,14 +412,11 @@ router.post("/save-resume", async (req, res) => {
     const resumeRef = await db.collection("resumes").add(resume);
 
     // Attach to user profile
-    await db
-      .collection("users")
-      .doc(uid)
-      .update({
-        resumeId: resumeRef.id,
-        hasResume: true,
-        resumeUpdatedAt: new Date(),
-      });
+    await db.collection("users").doc(uid).update({
+      resumeId: resumeRef.id,
+      hasResume: true,
+      resumeUpdatedAt: new Date(),
+    });
 
     res.status(200).json({
       message: "Resume saved successfully",
@@ -397,7 +447,10 @@ router.get("/:uid", async (req, res) => {
       return res.status(404).json({ message: "No resume found for this user" });
     }
 
-    const resumeDoc = await db.collection("resumes").doc(userData.resumeId).get();
+    const resumeDoc = await db
+      .collection("resumes")
+      .doc(userData.resumeId)
+      .get();
 
     if (!resumeDoc.exists) {
       return res.status(404).json({ message: "Resume not found" });
@@ -417,7 +470,7 @@ router.get("/:uid", async (req, res) => {
 router.post("/webhook", async (req, res) => {
   try {
     db = admin.firestore();
-    
+
     // Verify webhook signature
     const webhookSignature = req.headers["x-razorpay-signature"];
     const webhookSecret = process.env.RAZORPAY_WEBHOOK_SECRET;
@@ -472,7 +525,12 @@ router.post("/webhook", async (req, res) => {
       const userDoc = await db.collection("users").doc(uid).get();
       if (userDoc.exists) {
         const userData = userDoc.data();
-        await sendPaymentConfirmationEmail(userData.email, paymentRecord, userData.name, userData.language || "en");
+        await sendPaymentConfirmationEmail(
+          userData.email,
+          paymentRecord,
+          userData.name,
+          userData.language || "en",
+        );
       }
 
       console.log(`Payment captured for UID: ${uid}, Amount: ₹${amount}`);
@@ -505,9 +563,14 @@ router.post("/webhook", async (req, res) => {
 });
 
 // Send payment confirmation email
-async function sendPaymentConfirmationEmail(email, payment, name, language = "en") {
+async function sendPaymentConfirmationEmail(
+  email,
+  payment,
+  name,
+  language = "en",
+) {
   const templates = emailTemplates[language] || emailTemplates["en"];
-  
+
   const msg = {
     to: email,
     from: process.env.DEFAULT_FROM_EMAIL,
@@ -538,12 +601,12 @@ async function sendPaymentConfirmationEmail(email, payment, name, language = "en
               </tr>
               <tr>
                 <td style="padding: 8px 0; color: #666;">${templates.date_label}:</td>
-                <td style="padding: 8px 0; color: #333; text-align: right;">${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}</td>
+                <td style="padding: 8px 0; color: #333; text-align: right;">${new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })}</td>
               </tr>
             </table>
           </div>
           <p style="color: #999; font-size: 12px; margin-top: 30px;">
-            ${templates.otp_expiry_msg.split('.')[0]}
+            ${templates.otp_expiry_msg.split(".")[0]}
           </p>
         </div>
       </div>

@@ -126,7 +126,8 @@ const index = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, seterror] = useState<string | null>(null);
   const [userData, setUserData] = useState<any>(null);
-  const [includeResume, setIncludeResume] = useState(true);
+
+  const [loadingUserData, setLoadingUserData] = useState(false);
 
   useEffect(() => {
     const fetchdata = async () => {
@@ -139,10 +140,23 @@ const index = () => {
         // Fetch user data if logged in
         if (user?.uid) {
           try {
+            setLoadingUserData(true);
+
             const userRes = await axios.get(getApiEndpoint(`/users/${user.uid}`));
-            setUserData(userRes.data);
+
+            // Extract user object from API response wrapper
+
+            const extractedUserData = userRes.data.user || userRes.data;
+
+            setUserData(extractedUserData);
+
+            console.log("✅ User data fetched:", extractedUserData);
+
+            console.log("✅ Resume ID:", extractedUserData.resumeId);
           } catch (e) {
             console.error("Error fetching user data:", e);
+          } finally {
+            setLoadingUserData(false);
           }
         }
       } catch (error: any) {
@@ -220,7 +234,7 @@ const index = () => {
         user: user,
         Application: id,
         availability,
-        resumeId: includeResume ? userData?.resumeId : null,
+        resumeId: userData?.resumeId || null,
       };
       await axios.post(
         getApiEndpoint("/application"),
@@ -359,30 +373,29 @@ const index = () => {
                 <h3 className="text-lg font-semibold text-gray-900 mb-2">
                   Your Resume
                 </h3>
-                {userData?.resumeId ? (
+                {loadingUserData ? (
+                  <div className="flex items-center justify-center py-4">
+                    <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
+                    <span className="ml-3 text-gray-600">Loading resume...</span>
+                  </div>
+                ) : userData?.resumeId ? (
                   <div className="flex flex-col gap-3">
                     <div className="flex items-center justify-between bg-white p-3 border rounded">
-                      <div className="flex items-center gap-2 text-sm sm:text-base">
-                        <CheckCircle2 className="w-5 h-5 text-green-500" />
-                        <span className="font-medium text-gray-800">Default Resume Attached</span>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
-                          <input 
-                            type="checkbox" 
-                            checked={includeResume} 
-                            onChange={(e) => setIncludeResume(e.target.checked)}
-                            className="w-4 h-4 text-blue-600 hover:cursor-pointer"
-                          />
-                          Include
-                        </label>
+                      <div className="flex items-center gap-2 text-sm sm:text-base flex-1">
+                        <CheckCircle2 className="w-5 h-5 text-green-500 flex-shrink-0" />
+                        <div className="flex flex-col flex-1 min-w-0">
+                          <span className="font-medium text-gray-800 truncate">
+                            {userData?.resumeName || user?.name || 'Resume'}
+                          </span>
+                          <span className="text-xs text-green-600 font-medium">✓ Attached automatically</span>
+                        </div>
                       </div>
                     </div>
                   </div>
                 ) : (
                   <div className="text-gray-600 text-sm sm:text-base">
                     <p className="mb-2">You don't have a default resume attached to your profile.</p>
-                    <p className="text-sm">You can <Link href="/su" className="text-blue-600 hover:underline font-medium">create one</Link> or proceed without it (optional).</p>
+                    <p className="text-sm">You can <Link href="/resume" className="text-blue-600 hover:underline font-medium">create one</Link> or proceed without it (optional).</p>
                   </div>
                 )}
               </div>

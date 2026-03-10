@@ -797,11 +797,19 @@ export default function PublicSpace() {
                   <div className="grid grid-cols-2 gap-2">
                     {previewUrls.map((url, idx) => (
                       <div key={idx} className="relative group">
-                        <img
-                          src={url}
-                          alt={`Media ${idx}`}
-                          className="w-full h-32 object-cover rounded-lg border-2 border-gray-200 group-hover:border-blue-400 transition-all"
-                        />
+                        {selectedFiles[idx]?.type?.startsWith('video/') ? (
+                          <video
+                            src={url}
+                            className="w-full h-32 object-cover rounded-lg border-2 border-gray-200 group-hover:border-blue-400 transition-all"
+                            controls
+                          />
+                        ) : (
+                          <img
+                            src={url}
+                            alt={`Media ${idx}`}
+                            className="w-full h-32 object-cover rounded-lg border-2 border-gray-200 group-hover:border-blue-400 transition-all"
+                          />
+                        )}
                         <button
                           onClick={() => removeMedia(idx)}
                           className="absolute top-2 right-2 bg-red-500 text-white p-1.5 rounded-full hover:bg-red-600 shadow-lg transform hover:scale-110 transition-all"
@@ -974,14 +982,26 @@ export default function PublicSpace() {
                   {/* Media */}
                   {post.mediaUrls && post.mediaUrls.length > 0 && (
                     <div className={`gap-2 mb-4 ${post.mediaUrls.length === 1 ? 'grid grid-cols-1' : 'grid grid-cols-2'}`}>
-                      {post.mediaUrls.map((url: string, idx: number) => (
-                        <img
-                          key={idx}
-                          src={url}
-                          alt={`Post media ${idx}`}
-                          className="w-full h-64 object-cover rounded-lg"
-                        />
-                      ))}
+                      {post.mediaUrls.map((url: string, idx: number) => {
+                        const isVideo = url.match(/\\.(mp4|webm|ogg)$/i) || url.includes('/video/upload/');
+                        return isVideo ? (
+                          <video
+                            key={idx}
+                            src={url}
+                            className="w-full h-64 object-cover rounded-lg bg-black"
+                            controls
+                            preload="metadata"
+                          />
+                        ) : (
+                          <img
+                            key={idx}
+                            src={url}
+                            alt={`Post media ${idx}`}
+                            className="w-full h-64 object-cover rounded-lg"
+                            loading="lazy"
+                          />
+                        );
+                      })}
                     </div>
                   )}
 
